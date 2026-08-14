@@ -30,7 +30,10 @@ public class FrontendTests : IClassFixture<BankingReconciliationWebApplicationFa
         Assert.Contains("Excel indir", html);
         Assert.Contains("Validasyon yap", html);
         Assert.Contains("operator-identity", html);
-        Assert.Contains("Kullanıcı adını girin", html);
+        Assert.Contains("Önce giriş yapın", html);
+        Assert.Contains("login-form", html);
+        Assert.Contains("register-form", html);
+        Assert.Contains("user-management-panel", html);
         Assert.DoesNotContain("Sunumu tek tıkla hazırla", html);
         Assert.Contains("advanced-settings-toggle", html);
         Assert.Contains("workflow-guide", html);
@@ -53,11 +56,12 @@ public class FrontendTests : IClassFixture<BankingReconciliationWebApplicationFa
         Assert.Contains("file-queue-button", html);
         Assert.Contains("Arka planda karşılaştır", html);
         Assert.Contains("Onay Karari", html);
-        Assert.Contains("approval-token", html);
+        Assert.Contains("approval-user-note", html);
+        Assert.DoesNotContain("approval-token", html);
         Assert.Contains("approve-button", html);
         Assert.Contains("reject-button", html);
-        Assert.Contains("Yönetim Erişimi", html);
-        Assert.Contains("management-token", html);
+        Assert.Contains("Kullanıcı ve Rol Yönetimi", html);
+        Assert.DoesNotContain("management-token", html);
         Assert.Contains("İşlem Kayıtları", html);
         Assert.Contains("audit-filter-form", html);
         Assert.Contains("audit-retention-status", html);
@@ -117,21 +121,6 @@ public class FrontendTests : IClassFixture<BankingReconciliationWebApplicationFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(expectedMediaType, response.Content.Headers.ContentType?.MediaType);
-    }
-
-    [Theory]
-    [InlineData("comparison-file-1", "comparison-file-1.csv")]
-    [InlineData("comparison-file-2", "comparison-file-2.csv")]
-    [InlineData("invalid-comparison-file", "invalid-comparison-file.csv")]
-    public async Task DemoFile_ReturnsDownloadableCsv(string fileKey, string expectedFileName)
-    {
-        using var response = await _client.GetAsync($"/api/demo-files/{fileKey}");
-        var csv = await response.Content.ReadAsStringAsync();
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal("text/csv", response.Content.Headers.ContentType?.MediaType);
-        Assert.Equal(expectedFileName, response.Content.Headers.ContentDisposition?.FileNameStar);
-        Assert.Contains("BranchCode,FundCode,TransactionNumber", csv);
     }
 
     [Fact]

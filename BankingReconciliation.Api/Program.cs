@@ -22,6 +22,15 @@ var reconciliationConnectionString = builder.Configuration.GetConnectionString("
 var authenticationOptions = builder.Configuration
     .GetSection(ReconciliationAuthenticationOptions.SectionName)
     .Get<ReconciliationAuthenticationOptions>() ?? new ReconciliationAuthenticationOptions();
+var localAccountsEnabled = (builder.Environment.IsDevelopment() ||
+        builder.Environment.IsEnvironment("Testing")) &&
+    string.IsNullOrWhiteSpace(authenticationOptions.Authority);
+if (localAccountsEnabled && authenticationOptions.LocalSigningKey.Length < 32)
+{
+    authenticationOptions.LocalSigningKey = LocalAuthenticationSigningKeyProvider.GetOrCreate(builder.Environment);
+    builder.Configuration[$"{ReconciliationAuthenticationOptions.SectionName}:LocalSigningKey"] =
+        authenticationOptions.LocalSigningKey;
+}
 var usePostgres = !builder.Environment.IsEnvironment("Testing") &&
     !string.IsNullOrWhiteSpace(reconciliationConnectionString);
 var uploadOptions = builder.Configuration
@@ -67,6 +76,7 @@ if (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Te
 builder.Services
     .AddOptions<ReconciliationAuthenticationOptions>()
     .Bind(builder.Configuration.GetSection(ReconciliationAuthenticationOptions.SectionName))
+    .Validate(options => !string.IsNullOrWhiteSpace(options.OperatorRole), "OperatorRole is required.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.ApproverRole), "ApproverRole is required.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.PermissionClaimType), "PermissionClaimType is required.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.ApproverPermission), "ApproverPermission is required.")
@@ -95,10 +105,10 @@ builder.Services
             options.Audience = authenticationOptions.Audience;
         }
 
-        var useLocalDemoTokens = (builder.Environment.IsDevelopment() ||
+        var useLocalTokens = (builder.Environment.IsDevelopment() ||
                 builder.Environment.IsEnvironment("Testing")) &&
             string.IsNullOrWhiteSpace(authenticationOptions.Authority) &&
-            authenticationOptions.DemoSigningKey.Length >= 32;
+            authenticationOptions.LocalSigningKey.Length >= 32;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             NameClaimType = authenticationOptions.NameClaimType,
@@ -109,8 +119,8 @@ builder.Services
             RequireExpirationTime = true,
             RequireSignedTokens = true,
             ClockSkew = TimeSpan.FromSeconds(authenticationOptions.ClockSkewSeconds),
-            IssuerSigningKey = useLocalDemoTokens
-                ? new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authenticationOptions.DemoSigningKey))
+            IssuerSigningKey = useLocalTokens
+                ? new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authenticationOptions.LocalSigningKey))
                 : null
         };
     });
@@ -145,7 +155,8 @@ builder.Services.AddScoped<ITransactionFileParser>(serviceProvider => new CsvTra
         serviceProvider.GetRequiredService<ReconciliationFileSchemaStore>().GetOptions()),
     serviceProvider.GetRequiredService<Microsoft.Extensions.Options.IOptions<ReconciliationUploadOptions>>()));
 builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<DemoAuthenticationTokenService>();
+builder.Services.AddSingleton<ILocalUserAccountStore, LocalUserAccountStore>();
+builder.Services.AddSingleton<LocalAuthenticationTokenService>();
 if (!usePostgres)
 {
     builder.Services.AddSingleton<IReconciliationHistoryRepository, InMemoryReconciliationHistoryRepository>();
@@ -490,6 +501,30 @@ app.UseRateLimiter();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthentication();
+if (localAccountsEnabled)
+{
+    app.Use(async (context, next) =>
+    {
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            var actor = ReconciliationUserIdentity.GetActor(context.User);
+            var userStore = context.RequestServices.GetRequiredService<ILocalUserAccountStore>();
+            var localUser = actor is null ? null : userStore.GetByUsername(actor);
+            if (localUser is not null)
+            {
+                var tokenService = context.RequestServices.GetRequiredService<LocalAuthenticationTokenService>();
+                var expectedRole = tokenService.GetConfiguredRole(localUser.Role);
+                if (!context.User.IsInRole(expectedRole))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return;
+                }
+            }
+        }
+
+        await next();
+    });
+}
 app.UseAuthorization();
 
 app.MapGet("/api/health", () => Results.Ok(new
@@ -525,7 +560,7 @@ app.MapGet(
 app.MapReconciliationEndpoints();
 app.MapReconciliationSourceEndpoints();
 app.MapReconciliationAuditEndpoints();
-app.MapDemoAuthenticationEndpoints();
+app.MapLocalAuthenticationEndpoints(app.Environment);
 
 app.Run();
 

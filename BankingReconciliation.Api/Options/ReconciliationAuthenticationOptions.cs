@@ -10,10 +10,12 @@ public class ReconciliationAuthenticationOptions
     public int ClockSkewSeconds { get; set; } = 60;
     public string NameClaimType { get; set; } = "name";
     public string RoleClaimType { get; set; } = "role";
+    public string OperatorRole { get; set; } = "ReconciliationOperator";
     public string ApproverRole { get; set; } = "ReconciliationApprover";
     public string PermissionClaimType { get; set; } = "permission";
     public string ApproverPermission { get; set; } = "reconciliation.approve";
     public string AdministratorRole { get; set; } = "ReconciliationAdministrator";
     public string AdministratorPermission { get; set; } = "reconciliation.manage";
-    public string DemoSigningKey { get; set; } = string.Empty;
+    public string LocalSigningKey { get; set; } = string.Empty;
+    public string LocalUserStorePath { get; set; } = string.Empty;
 }

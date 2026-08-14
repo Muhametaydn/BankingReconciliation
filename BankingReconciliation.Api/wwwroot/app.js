@@ -1,5 +1,21 @@
 const form = document.querySelector("#compare-form");
 const operatorIdentity = document.querySelector("#operator-identity");
+const loginForm = document.querySelector("#login-form");
+const loginUsername = document.querySelector("#login-username");
+const loginPassword = document.querySelector("#login-password");
+const registerForm = document.querySelector("#register-form");
+const registerUsername = document.querySelector("#register-username");
+const registerPassword = document.querySelector("#register-password");
+const authenticationForms = document.querySelector("#authentication-forms");
+const authenticatedSession = document.querySelector("#authenticated-session");
+const authenticatedUsername = document.querySelector("#authenticated-username");
+const authenticatedRole = document.querySelector("#authenticated-role");
+const authenticationStatus = document.querySelector("#authentication-status");
+const logoutButton = document.querySelector("#logout-button");
+const userManagementPanel = document.querySelector("#user-management-panel");
+const refreshUsersButton = document.querySelector("#refresh-users-button");
+const userManagementStatus = document.querySelector("#user-management-status");
+const userList = document.querySelector("#user-list");
 const advancedSettingsToggle = document.querySelector("#advanced-settings-toggle");
 const comparisonNarrative = document.querySelector("#comparison-narrative");
 const comparisonNarrativeText = document.querySelector("#comparison-narrative-text");
@@ -24,12 +40,11 @@ const exportButton = document.querySelector("#export-button");
 const selectedBatchInfo = document.querySelector("#selected-batch-info");
 const approvalStatus = document.querySelector("#approval-status");
 const approvalDecisionMeta = document.querySelector("#approval-decision-meta");
-const approvalToken = document.querySelector("#approval-token");
+const approvalUserNote = document.querySelector("#approval-user-note");
 const approvalComment = document.querySelector("#approval-comment");
 const approveButton = document.querySelector("#approve-button");
 const rejectButton = document.querySelector("#reject-button");
 const approvalFeedback = document.querySelector("#approval-feedback");
-const managementToken = document.querySelector("#management-token");
 const schemaList = document.querySelector("#schema-list");
 const schemaStatus = document.querySelector("#schema-status");
 const schemaSaveButton = document.querySelector("#schema-save-button");
@@ -72,7 +87,8 @@ let runtimeSettings = {
     maxCsvFileSizeBytes: 5 * 1024 * 1024
 };
 let historyRefreshInProgress = false;
-let operatorAccessToken = "";
+let accessToken = sessionStorage.getItem("reconciliationAccessToken") ?? "";
+let currentUser = null;
 const defaultResultFields = ["BranchCode", "FundCode", "TransactionNumber"];
 const requiredCoreFields = new Set(defaultResultFields.concat(["TransactionDate", "Quantity", "Amount"]));
 const historyPageSize = 10;
@@ -88,9 +104,11 @@ const counters = {
     resultCount: document.querySelector("#result-count")
 };
 
-operatorIdentity.addEventListener("input", () => {
-    setWorkflowStep(1, operatorIdentity.value.trim() ? "complete" : "pending");
-});
+loginForm.addEventListener("submit", login);
+registerForm.addEventListener("submit", register);
+logoutButton.addEventListener("click", logout);
+refreshUsersButton.addEventListener("click", loadUsers);
+userList.addEventListener("change", updateUserRole);
 
 branchFileInput.addEventListener("change", () => {
     updateFileName(branchFileInput, branchFileName);
@@ -106,7 +124,8 @@ copyNarrativeButton.addEventListener("click", copyComparisonNarrative);
 advancedSettingsToggle.addEventListener("click", () => {
     const shouldShow = advancedSettingsToggle.getAttribute("aria-expanded") !== "true";
     for (const section of document.querySelectorAll(".advanced-configuration")) {
-        section.hidden = !shouldShow;
+        const requiresAdministrator = section.dataset.adminOnly === "true";
+        section.hidden = !shouldShow || (requiresAdministrator && currentUser?.role !== "Administrator");
     }
     advancedSettingsToggle.setAttribute("aria-expanded", String(shouldShow));
     advancedSettingsToggle.textContent = shouldShow
@@ -122,7 +141,6 @@ resetButton.addEventListener("click", () => {
     hideValidationStatus();
     selectedBatchId = null;
     selectedBatch = null;
-    if (!operatorAccessToken) approvalToken.value = "";
     approvalComment.value = "";
     hideApprovalFeedback();
     currentResults = [];
@@ -280,8 +298,6 @@ document.querySelector("#comparison-settings-form").addEventListener("click", ev
 statusFilter.addEventListener("change", () => {
     renderFilteredResults();
 });
-
-approvalToken.addEventListener("input", updateApprovalActions);
 
 auditRefreshButton.addEventListener("click", async () => {
     await loadAuditEvents();
@@ -455,6 +471,214 @@ function getNetworkErrorMessage() {
     return "API istegi tamamlanamadi. Uygulamanin calistigindan ve sayfayi http://localhost:5230 adresinden actiginizdan emin olun.";
 }
 
+async function login(event) {
+    event.preventDefault();
+    await authenticate("/api/auth/login", loginUsername.value, loginPassword.value, "Giriş başarılı.");
+    loginPassword.value = "";
+}
+
+async function register(event) {
+    event.preventDefault();
+    await authenticate("/api/auth/register", registerUsername.value, registerPassword.value, "Kayıt tamamlandı.");
+    registerPassword.value = "";
+}
+
+async function authenticate(endpoint, username, password, successMessage) {
+    hideAuthenticationStatus();
+    try {
+        const response = await fetch(endpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: username.trim(), password })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const message = response.status === 401
+                ? "Kullanıcı adı veya parola hatalı."
+                : formatError(payload);
+            throw new Error(message);
+        }
+
+        applyAuthenticationSession(payload.accessToken, payload.user);
+        const firstAdminMessage = payload.isFirstAdministrator
+            ? " İlk kullanıcı olduğunuz için Admin yetkisi verildi."
+            : "";
+        showAuthenticationStatus(successMessage + firstAdminMessage, "success");
+    } catch (error) {
+        showAuthenticationStatus(error.message || getNetworkErrorMessage(), "error");
+    }
+}
+
+async function restoreAuthenticationSession() {
+    if (!accessToken) {
+        updateAuthenticationUi();
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/auth/session", { headers: createAuthorizationHeaders() });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error();
+        currentUser = payload;
+        updateAuthenticationUi();
+    } catch {
+        clearAuthenticationSession();
+        updateAuthenticationUi();
+    }
+}
+
+function applyAuthenticationSession(token, user) {
+    accessToken = token;
+    currentUser = user;
+    sessionStorage.setItem("reconciliationAccessToken", token);
+    updateAuthenticationUi();
+}
+
+function logout() {
+    clearAuthenticationSession();
+    updateAuthenticationUi();
+    showAuthenticationStatus("Oturum kapatıldı.", "success");
+}
+
+function clearAuthenticationSession() {
+    accessToken = "";
+    currentUser = null;
+    sessionStorage.removeItem("reconciliationAccessToken");
+}
+
+function updateAuthenticationUi() {
+    const isAuthenticated = Boolean(accessToken && currentUser);
+    const isAdministrator = currentUser?.role === "Administrator";
+    authenticationForms.hidden = isAuthenticated;
+    authenticatedSession.hidden = !isAuthenticated;
+    authenticatedUsername.textContent = currentUser?.username ?? "";
+    authenticatedRole.textContent = currentUser ? formatUserRole(currentUser.role) : "";
+    authenticatedRole.className = `role-badge role-${String(currentUser?.role ?? "none").toLowerCase()}`;
+    operatorIdentity.value = currentUser?.username ?? "";
+    setWorkflowStep(1, isAuthenticated ? "complete" : "active");
+    compareButton.disabled = !isAuthenticated;
+    fileQueueButton.disabled = !isAuthenticated;
+    databaseCompareButton.disabled = !isAuthenticated || !areDatabaseSourcesReady();
+    databaseQueueButton.disabled = !isAuthenticated || !areDatabaseSourcesReady();
+    approvalUserNote.textContent = currentUser?.role === "Approver"
+        ? `${currentUser.username} Approver olarak karar verebilir.`
+        : "Onay veya red için Approver hesabıyla giriş yapın.";
+    updateApprovalActions();
+    setAdministratorControls(isAdministrator);
+
+    if (!isAdministrator) {
+        userManagementPanel.hidden = true;
+    } else if (advancedSettingsToggle.getAttribute("aria-expanded") === "true") {
+        userManagementPanel.hidden = false;
+        loadUsers();
+    }
+}
+
+function setAdministratorControls(isAdministrator) {
+    const selectors = [
+        ".schema-section input", ".schema-section select", ".schema-section textarea", ".schema-section button",
+        ".settings-section input", ".settings-section select", ".settings-section textarea", ".settings-section button",
+        ".sources-section [data-source-field]", ".sources-section [data-source-save]"
+    ];
+    for (const control of document.querySelectorAll(selectors.join(","))) {
+        if (control.dataset.adminOriginalDisabled === undefined) {
+            control.dataset.adminOriginalDisabled = String(control.disabled);
+        }
+        control.disabled = !isAdministrator || control.dataset.adminOriginalDisabled === "true";
+    }
+}
+
+function createAuthorizationHeaders(includeContentType = false) {
+    const headers = accessToken ? { "Authorization": `Bearer ${accessToken}` } : {};
+    if (includeContentType) headers["Content-Type"] = "application/json";
+    return headers;
+}
+
+function showAuthenticationStatus(message, status) {
+    authenticationStatus.textContent = message;
+    authenticationStatus.className = `validation-status validation-status-${status}`;
+    authenticationStatus.hidden = false;
+}
+
+function hideAuthenticationStatus() {
+    authenticationStatus.hidden = true;
+    authenticationStatus.textContent = "";
+}
+
+async function loadUsers() {
+    if (currentUser?.role !== "Administrator") return;
+    refreshUsersButton.disabled = true;
+    try {
+        const response = await fetch("/api/auth/users", { headers: createAuthorizationHeaders() });
+        const payload = await response.json().catch(() => ([]));
+        if (!response.ok) throw new Error(formatManagementError(response.status, payload));
+        renderUsers(payload);
+        showUserManagementStatus(`${payload.length} kullanıcı listelendi.`, "success");
+    } catch (error) {
+        showUserManagementStatus(error.message || getNetworkErrorMessage(), "error");
+    } finally {
+        refreshUsersButton.disabled = false;
+    }
+}
+
+function renderUsers(users) {
+    userList.replaceChildren();
+    for (const user of users) {
+        const item = document.createElement("article");
+        item.className = "user-item";
+        const identity = document.createElement("div");
+        const name = document.createElement("strong");
+        name.textContent = user.username;
+        const createdAt = document.createElement("small");
+        createdAt.textContent = `Kayıt: ${formatDateTime(user.createdAt)}`;
+        identity.append(name, createdAt);
+        const role = document.createElement("select");
+        role.dataset.userRole = user.id;
+        for (const value of ["Operator", "Approver", "Administrator"]) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = formatUserRole(value);
+            option.selected = value === user.role;
+            role.append(option);
+        }
+        if (user.id === currentUser?.id) role.disabled = true;
+        item.append(identity, role);
+        userList.append(item);
+    }
+}
+
+async function updateUserRole(event) {
+    const select = event.target.closest("[data-user-role]");
+    if (!select) return;
+    select.disabled = true;
+    try {
+        const response = await fetch(`/api/auth/users/${select.dataset.userRole}/role`, {
+            method: "PUT",
+            headers: createAuthorizationHeaders(true),
+            body: JSON.stringify({ role: select.value })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(formatError(payload));
+        showUserManagementStatus(`${payload.username} kullanıcısının rolü güncellendi. Yeniden giriş yapmalıdır.`, "success");
+        await loadUsers();
+    } catch (error) {
+        showUserManagementStatus(error.message || getNetworkErrorMessage(), "error");
+        await loadUsers();
+    }
+}
+
+function showUserManagementStatus(message, status) {
+    userManagementStatus.textContent = message;
+    userManagementStatus.className = `validation-status validation-status-${status}`;
+    userManagementStatus.hidden = false;
+}
+
+function formatUserRole(role) {
+    if (role === "Administrator") return "Admin";
+    if (role === "Approver") return "Onaylayıcı";
+    return "Operatör";
+}
+
 async function validateFile(file) {
     const body = new FormData();
     body.append("file", file);
@@ -473,22 +697,18 @@ async function validateFile(file) {
 }
 
 function createInitiatorHeaders() {
-    if (operatorAccessToken) {
-        return { "Authorization": `Bearer ${operatorAccessToken}` };
-    }
-    const identity = operatorIdentity.value.trim();
-    return identity ? { "X-Reconciliation-Initiator": identity } : {};
+    return createAuthorizationHeaders();
 }
 
 function setBusy(isBusy, label = "Karşılaştırılıyor") {
-    compareButton.disabled = isBusy;
-    fileQueueButton.disabled = isBusy;
+    compareButton.disabled = isBusy || !currentUser;
+    fileQueueButton.disabled = isBusy || !currentUser;
     validateButton.disabled = isBusy;
     compareButton.textContent = isBusy ? label : "Karşılaştır";
     fileQueueButton.textContent = isBusy ? label : "Arka planda karşılaştır";
     validateButton.textContent = isBusy ? label : "Validasyon yap";
-    databaseCompareButton.disabled = isBusy || !areDatabaseSourcesReady();
-    databaseQueueButton.disabled = isBusy || !areDatabaseSourcesReady();
+    databaseCompareButton.disabled = isBusy || !currentUser || !areDatabaseSourcesReady();
+    databaseQueueButton.disabled = isBusy || !currentUser || !areDatabaseSourcesReady();
 }
 
 function applyComparisonResult(payload) {
@@ -835,6 +1055,7 @@ function renderSources(sources = []) {
     }
 
     updateDatabaseCompareButton();
+    setAdministratorControls(currentUser?.role === "Administrator");
 }
 
 function areDatabaseSourcesReady() {
@@ -844,8 +1065,8 @@ function areDatabaseSourcesReady() {
 
 function updateDatabaseCompareButton() {
     const isReady = areDatabaseSourcesReady();
-    databaseCompareButton.disabled = !isReady;
-    databaseQueueButton.disabled = !isReady;
+    databaseCompareButton.disabled = !currentUser || !isReady;
+    databaseQueueButton.disabled = !currentUser || !isReady;
 }
 
 async function compareDatabaseSources() {
@@ -1036,6 +1257,7 @@ function renderComparisonSettings(settings) {
     renderMappingRows("transactionNumberMappings", settings.transactionNumberMappings);
     renderFieldMappingRows(settings.fieldMappings);
     if (selectedBatch) renderSummary(selectedBatch);
+    setAdministratorControls(currentUser?.role === "Administrator");
 }
 
 function populateComparisonFieldSelectors(settings = null) {
@@ -1373,6 +1595,7 @@ function renderFileSchema(columns = []) {
         updateSchemaTypeVisibility(item);
     });
     populateComparisonFieldSelectors(currentComparisonSettings);
+    setAdministratorControls(currentUser?.role === "Administrator");
 }
 
 function createSchemaActionButton(action, text, index, disabled, label) {
@@ -1716,18 +1939,18 @@ function updateApprovalActions() {
     const canDecide = Boolean(selectedBatchId) &&
         status === "Completed" &&
         selectedBatch?.approvalStatus === "Pending" &&
-        approvalToken.value.trim().length > 0;
+        currentUser?.role === "Approver" &&
+        Boolean(accessToken);
     approveButton.disabled = !canDecide;
     rejectButton.disabled = !canDecide;
 }
 
 async function submitApproval(decision) {
     hideApprovalFeedback();
-    const token = approvalToken.value.trim();
     const comment = approvalComment.value.trim();
 
-    if (!selectedBatchId || !token) {
-        showApprovalFeedback("Tamamlanmis bir mutabakat ve onay erisim anahtari gereklidir.", "error");
+    if (!selectedBatchId || currentUser?.role !== "Approver" || !accessToken) {
+        showApprovalFeedback("Tamamlanmış bir mutabakat ve Approver oturumu gereklidir.", "error");
         return;
     }
 
@@ -1741,10 +1964,7 @@ async function submitApproval(decision) {
     try {
         const response = await fetch(`/api/reconciliations/${selectedBatchId}/approval`, {
             method: "POST",
-            headers: {
-                "Authorization": `Bearer ${token}`,
-                "Content-Type": "application/json"
-            },
+            headers: createAuthorizationHeaders(true),
             body: JSON.stringify({ decision, comment: comment || null })
         });
         const payload = await response.json().catch(() => ({}));
@@ -1770,7 +1990,7 @@ async function submitApproval(decision) {
 
 function formatApprovalError(status, payload) {
     if (status === 401) {
-        return "Onay erisim anahtari gecersiz veya suresi dolmus.";
+        return "Oturum geçersiz veya süresi dolmuş. Yeniden giriş yapın.";
     }
     if (status === 403) {
         return "Bu kullanicinin onay yetkisi yok.";
@@ -1819,24 +2039,21 @@ function hideApprovalFeedback() {
 }
 
 function requireManagementAccess(showStatus) {
-    if (managementToken.value.trim()) {
+    if (accessToken && currentUser?.role === "Administrator") {
         return true;
     }
 
-    showStatus("Bu islem icin yonetim erisim anahtarini girin.", "error");
+    showStatus("Bu işlem için Admin hesabıyla giriş yapın.", "error");
     return false;
 }
 
 function createManagementHeaders() {
-    return {
-        "Authorization": `Bearer ${managementToken.value.trim()}`,
-        "Content-Type": "application/json"
-    };
+    return createAuthorizationHeaders(true);
 }
 
 function formatManagementError(status, payload) {
     if (status === 401) {
-        return "Yonetim erisim anahtari gecersiz veya suresi dolmus.";
+        return "Oturum geçersiz veya süresi dolmuş. Yeniden giriş yapın.";
     }
     if (status === 403) {
         return "Bu kullanicinin yonetim yetkisi yok.";
@@ -1845,10 +2062,10 @@ function formatManagementError(status, payload) {
 }
 
 async function loadAuditEvents(silent = false) {
-    if (!managementToken.value.trim()) {
+    if (!accessToken || currentUser?.role !== "Administrator") {
         auditRetentionStatus.hidden = true;
         if (!silent) {
-            showAuditStatus("Islem kayitlari icin yonetim erisim anahtarini girin.", "error");
+            showAuditStatus("İşlem kayıtları için Admin hesabıyla giriş yapın.", "error");
         }
         return;
     }
@@ -1869,9 +2086,7 @@ async function loadAuditEvents(silent = false) {
     auditRefreshButton.disabled = true;
     try {
         const response = await fetch(`/api/reconciliation-audit-events?${query}`, {
-            headers: {
-                "Authorization": `Bearer ${managementToken.value.trim()}`
-            }
+            headers: createAuthorizationHeaders()
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -1893,9 +2108,7 @@ async function loadAuditEvents(silent = false) {
 async function loadAuditRetentionStatus() {
     try {
         const response = await fetch("/api/reconciliation-audit-retention/status", {
-            headers: {
-                "Authorization": `Bearer ${managementToken.value.trim()}`
-            }
+            headers: createAuthorizationHeaders()
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
@@ -2013,6 +2226,10 @@ function formatAuditAction(action) {
             return "Mutabakat onaylandi";
         case "ReconciliationRejected":
             return "Mutabakat reddedildi";
+        case "UserRegistered":
+            return "Kullanıcı kaydı oluşturuldu";
+        case "UserRoleUpdated":
+            return "Kullanıcı rolü güncellendi";
         case "SourceUpdated":
             return "Veri kaynagi guncellendi";
         case "FileSchemaUpdated":
@@ -2028,6 +2245,8 @@ function formatAuditResource(resourceType) {
     switch (resourceType) {
         case "ReconciliationBatch":
             return "Mutabakat";
+        case "UserAccount":
+            return "Kullanıcı hesabı";
         case "ReconciliationSource":
             return "Veri kaynagi";
         case "FileSchema":
@@ -2264,6 +2483,8 @@ function formatDateTime(value) {
 renderSummary();
 renderFilteredResults();
 updateSelectedBatchInfo();
+updateAuthenticationUi();
+restoreAuthenticationSession();
 loadFileSchema();
 loadComparisonSettings();
 loadSources();

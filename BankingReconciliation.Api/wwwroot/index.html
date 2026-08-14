@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mutabakat Yönetimi</title>
-    <link rel="stylesheet" href="/styles.css?v=20260814-2">
+    <link rel="stylesheet" href="/styles.css?v=20260814-4">
 </head>
 <body>
     <main class="shell">
@@ -26,23 +26,48 @@
             </header>
 
             <ol class="workflow-guide" aria-label="Sunum akışı">
-                <li data-workflow-step="1"><strong>1</strong><span>Kullanıcıları hazırla</span></li>
+                <li data-workflow-step="1"><strong>1</strong><span>Giriş yap</span></li>
                 <li data-workflow-step="2"><strong>2</strong><span>Dosyaları seç</span></li>
                 <li data-workflow-step="3"><strong>3</strong><span>Validasyon yap</span></li>
                 <li data-workflow-step="4"><strong>4</strong><span>Karşılaştır</span></li>
                 <li data-workflow-step="5"><strong>5</strong><span>Sonucu onayla</span></li>
             </ol>
 
-            <section class="management-access-panel advanced-configuration" aria-labelledby="management-access-title" hidden>
+            <section class="authentication-panel" aria-labelledby="authentication-title">
                 <div>
-                    <h2 id="management-access-title">Yönetim Erişimi</h2>
-                    <span class="section-note">Kaynak, şema ve karşılaştırma ayarı değişiklikleri için gereklidir.</span>
+                    <h2 id="authentication-title">Kullanıcı Girişi</h2>
+                    <span class="section-note">İlk kayıt olan kullanıcı Admin olur; sonraki hesaplar Operator olarak açılır.</span>
                 </div>
-                <label class="management-token-field">
-                    <span>Yönetim erişim anahtarı</span>
-                    <input id="management-token" type="password" autocomplete="off" spellcheck="false" placeholder="JWT erisim anahtari">
-                    <small>Yalnizca bu sayfada kullanilir; tarayicida kaydedilmez.</small>
-                </label>
+                <div id="authentication-forms" class="authentication-grid">
+                    <form id="login-form" class="authentication-form">
+                        <h3>Giriş yap</h3>
+                        <label><span>Kullanıcı adı</span><input id="login-username" type="text" autocomplete="username" required></label>
+                        <label><span>Parola</span><input id="login-password" type="password" autocomplete="current-password" required></label>
+                        <button type="submit">Giriş yap</button>
+                    </form>
+                    <form id="register-form" class="authentication-form">
+                        <h3>Kayıt ol</h3>
+                        <label><span>Kullanıcı adı</span><input id="register-username" type="text" minlength="3" maxlength="50" autocomplete="username" required></label>
+                        <label><span>Parola</span><input id="register-password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
+                        <small>En az 10 karakter; büyük harf, küçük harf ve rakam içermelidir.</small>
+                        <button type="submit" class="secondary">Kayıt ol</button>
+                    </form>
+                </div>
+                <div id="authenticated-session" class="authenticated-session" hidden>
+                    <div><span>Aktif kullanıcı</span><strong id="authenticated-username"></strong><span id="authenticated-role" class="role-badge"></span></div>
+                    <button id="logout-button" type="button" class="secondary">Çıkış yap</button>
+                </div>
+                <div id="authentication-status" class="validation-status" role="status" hidden></div>
+            </section>
+
+            <section id="user-management-panel" class="management-access-panel advanced-configuration" data-admin-only="true" aria-labelledby="management-access-title" hidden>
+                <div>
+                    <h2 id="management-access-title">Kullanıcı ve Rol Yönetimi</h2>
+                    <span class="section-note">Yalnızca Admin kullanıcıları Operator, Approver veya Administrator yapabilir.</span>
+                </div>
+                <button id="refresh-users-button" type="button" class="secondary">Kullanıcıları yenile</button>
+                <div id="user-management-status" class="validation-status" hidden></div>
+                <div id="user-list" class="user-list"><p class="empty-state">Kullanıcılar yükleniyor.</p></div>
             </section>
 
             <form id="compare-form" class="compare-panel">
@@ -56,8 +81,8 @@
                 </div>
                 <label class="operator-identity-field">
                     <span>İşlemi başlatan kullanıcı</span>
-                    <input id="operator-identity" type="text" maxlength="200" autocomplete="off" placeholder="Kullanıcı adını girin" required>
-                    <small>Dosyaları yükleyen ve karşılaştırmayı başlatan kullanıcıyı yazın.</small>
+                    <input id="operator-identity" type="text" maxlength="200" placeholder="Önce giriş yapın" readonly required>
+                    <small>Bu alan giriş yapan kullanıcıdan otomatik belirlenir ve değiştirilemez.</small>
                 </label>
                 <div class="file-grid">
                     <label class="file-drop" for="branch-file">
@@ -243,11 +268,7 @@
                         <span id="approval-status" class="approval-badge NotApplicable">Uygulanamaz</span>
                     </div>
                     <div class="approval-controls">
-                        <label class="approval-field approval-token-field">
-                            <span>Onay erisim anahtari</span>
-                            <input id="approval-token" type="password" autocomplete="off" spellcheck="false" placeholder="JWT erisim anahtari">
-                            <small>Yalnizca bu ekrandaki karar icin kullanilir; tarayicida kaydedilmez.</small>
-                        </label>
+                        <p id="approval-user-note" class="approval-field approval-user-note">Onay veya red için Approver hesabıyla giriş yapın.</p>
                         <label class="approval-field approval-comment-field">
                             <span>Karar notu</span>
                             <textarea id="approval-comment" rows="3" maxlength="1000" placeholder="Red icin gerekce zorunludur."></textarea>
@@ -327,7 +348,7 @@
                 </div>
             </section>
 
-            <section class="audit-section advanced-configuration" aria-labelledby="audit-title" hidden>
+            <section class="audit-section advanced-configuration" data-admin-only="true" aria-labelledby="audit-title" hidden>
                 <div class="results-header">
                     <div>
                         <h2 id="audit-title">İşlem Kayıtları</h2>
@@ -346,6 +367,8 @@
                             <option value="">Tumu</option>
                             <option value="ReconciliationApproved">Mutabakat onayi</option>
                             <option value="ReconciliationRejected">Mutabakat reddi</option>
+                            <option value="UserRegistered">Kullanıcı kaydı</option>
+                            <option value="UserRoleUpdated">Kullanıcı rolü değişikliği</option>
                             <option value="SourceUpdated">Kaynak degisikligi</option>
                             <option value="FileSchemaUpdated">Sema degisikligi</option>
                             <option value="ComparisonSettingsUpdated">Karşılaştırma ayarı</option>
@@ -356,6 +379,7 @@
                         <select id="audit-resource-type">
                             <option value="">Tumu</option>
                             <option value="ReconciliationBatch">Mutabakat</option>
+                            <option value="UserAccount">Kullanıcı hesabı</option>
                             <option value="ReconciliationSource">Veri kaynagi</option>
                             <option value="FileSchema">Dosya şeması</option>
                             <option value="ComparisonSettings">Karşılaştırma ayarları</option>
@@ -366,12 +390,12 @@
                 <div id="audit-status" class="validation-status" hidden></div>
                 <div id="audit-retention-status" class="audit-retention-status" hidden></div>
                 <div id="audit-list" class="audit-list">
-                    <p class="empty-state audit-empty">Kayitlari gormek icin yonetim erisim anahtarini girin.</p>
+                    <p class="empty-state audit-empty">Kayıtları görmek için Admin hesabıyla giriş yapın.</p>
                 </div>
             </section>
         </section>
     </main>
 
-    <script src="/app.js?v=20260814-2"></script>
+    <script src="/app.js?v=20260814-4"></script>
 </body>
 </html>

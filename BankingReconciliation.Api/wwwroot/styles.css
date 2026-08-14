@@ -157,7 +157,6 @@ h2 {
 .settings-section,
 .sources-section,
 .audit-section,
-.demo-access-panel,
 .management-access-panel {
     background: var(--panel);
     border: 1px solid var(--line);
@@ -185,44 +184,6 @@ h2 {
 
 .comparison-narrative .validation-status {
     grid-column: 1 / -1;
-}
-
-.demo-access-panel {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) auto;
-    gap: 16px;
-    align-items: center;
-    padding: 14px 16px;
-    border-color: #9ac6d8;
-    background: #f3fbfe;
-}
-
-.demo-access-panel .validation-status {
-    grid-column: 1 / -1;
-}
-
-.demo-file-links {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-    color: var(--muted);
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.demo-file-links a {
-    border: 1px solid #9ac6d8;
-    border-radius: 999px;
-    padding: 6px 10px;
-    color: var(--accent-dark);
-    background: #fff;
-    text-decoration: none;
-}
-
-.demo-file-links a:hover {
-    background: #e9f7fc;
 }
 
 .compare-panel {
@@ -335,6 +296,106 @@ button:hover {
 button:disabled {
     cursor: not-allowed;
     opacity: 0.7;
+}
+
+.authentication-panel {
+    display: grid;
+    gap: 18px;
+    padding: 24px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--surface);
+}
+
+.authentication-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.authentication-form {
+    display: grid;
+    gap: 12px;
+    padding: 18px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-soft);
+}
+
+.authentication-form h3 {
+    margin: 0;
+}
+
+.authentication-form label {
+    display: grid;
+    gap: 6px;
+}
+
+.authenticated-session {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: var(--surface-soft);
+}
+
+.authenticated-session > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.role-badge {
+    display: inline-flex;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.user-list {
+    display: grid;
+    gap: 10px;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface-soft);
+}
+
+.user-item > div {
+    display: grid;
+    gap: 3px;
+}
+
+.approval-user-note {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: var(--surface-soft);
+}
+
+@media (max-width: 760px) {
+    .authentication-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .authenticated-session,
+    .user-item {
+        align-items: stretch;
+        flex-direction: column;
+    }
 }
 
 button.secondary {
@@ -1570,40 +1631,10 @@ body {
 .settings-section,
 .sources-section,
 .audit-section,
-.demo-access-panel,
 .management-access-panel {
     border-color: var(--line);
     border-radius: 16px;
     box-shadow: var(--soft-shadow);
-}
-
-.demo-access-panel {
-    padding: 20px 22px;
-    border-color: rgba(8, 127, 140, 0.24);
-    background: linear-gradient(120deg, #f3fcfc, #ffffff 68%);
-}
-
-.demo-access-panel h2::before {
-    content: "";
-    display: inline-block;
-    width: 9px;
-    height: 9px;
-    margin-right: 9px;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 5px rgba(8, 127, 140, 0.10);
-    vertical-align: 2px;
-}
-
-.demo-file-links {
-    padding-top: 14px;
-    border-top: 1px solid rgba(8, 127, 140, 0.12);
-}
-
-.demo-file-links a {
-    border-color: #cddde1;
-    border-radius: 9px;
-    padding: 7px 11px;
 }
 
 .compare-panel {
@@ -1852,8 +1883,6 @@ tbody tr { transition: background 120ms ease; }
     .workflow-guide { grid-template-columns: 1fr; gap: 0; }
     .workflow-guide li { min-height: 58px; border-right: 0; border-bottom: 1px solid var(--line); }
     .workflow-guide li:last-child { border-bottom: 0; }
-    .demo-access-panel { grid-template-columns: 1fr; padding: 18px; }
-    .demo-file-links { grid-column: auto; }
     .compare-panel { padding: 18px; }
     .file-drop { min-height: 138px; padding-left: 72px; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

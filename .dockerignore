@@ -2,6 +2,7 @@
 .github
 .vs
 .agents
+.local-data
 **/bin
 **/obj
 **/*.user

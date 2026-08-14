@@ -917,15 +917,15 @@ public static class ReconciliationEndpoints
             return authenticatedActor;
         }
 
-        if (!environment.IsDevelopment() && !environment.IsEnvironment("Testing"))
+        if (!environment.IsEnvironment("Testing"))
         {
             return null;
         }
 
-        var demoActor = request.Headers["X-Reconciliation-Initiator"].ToString().Trim();
-        if (demoActor.Length is > 0 and <= 200)
+        var testActor = request.Headers["X-Reconciliation-Initiator"].ToString().Trim();
+        if (testActor.Length is > 0 and <= 200)
         {
-            return demoActor;
+            return testActor;
         }
 
         return environment.IsEnvironment("Testing") ? "test-operator" : null;
