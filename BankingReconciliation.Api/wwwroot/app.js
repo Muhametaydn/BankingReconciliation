@@ -1,10 +1,6 @@
 const form = document.querySelector("#compare-form");
 const operatorIdentity = document.querySelector("#operator-identity");
-const demoSessionButton = document.querySelector("#demo-session-button");
-const demoSessionStatus = document.querySelector("#demo-session-status");
 const advancedSettingsToggle = document.querySelector("#advanced-settings-toggle");
-const loadValidDemoFilesButton = document.querySelector("#load-valid-demo-files");
-const loadInvalidDemoFilesButton = document.querySelector("#load-invalid-demo-files");
 const comparisonNarrative = document.querySelector("#comparison-narrative");
 const comparisonNarrativeText = document.querySelector("#comparison-narrative-text");
 const copyNarrativeButton = document.querySelector("#copy-narrative-button");
@@ -92,6 +88,10 @@ const counters = {
     resultCount: document.querySelector("#result-count")
 };
 
+operatorIdentity.addEventListener("input", () => {
+    setWorkflowStep(1, operatorIdentity.value.trim() ? "complete" : "pending");
+});
+
 branchFileInput.addEventListener("change", () => {
     updateFileName(branchFileInput, branchFileName);
     updateFileSelectionWorkflow();
@@ -102,10 +102,7 @@ bankFileInput.addEventListener("change", () => {
     updateFileSelectionWorkflow();
 });
 
-demoSessionButton.addEventListener("click", preparePresentation);
 copyNarrativeButton.addEventListener("click", copyComparisonNarrative);
-loadValidDemoFilesButton.addEventListener("click", () => loadDemoFiles(false));
-loadInvalidDemoFilesButton.addEventListener("click", () => loadDemoFiles(true));
 advancedSettingsToggle.addEventListener("click", () => {
     const shouldShow = advancedSettingsToggle.getAttribute("aria-expanded") !== "true";
     for (const section of document.querySelectorAll(".advanced-configuration")) {
@@ -481,96 +478,6 @@ function createInitiatorHeaders() {
     }
     const identity = operatorIdentity.value.trim();
     return identity ? { "X-Reconciliation-Initiator": identity } : {};
-}
-
-async function prepareDemoSession() {
-    demoSessionButton.disabled = true;
-    demoSessionButton.textContent = "Hazırlanıyor";
-    demoSessionStatus.hidden = true;
-    try {
-        const response = await fetch("/api/demo-auth/session", { method: "POST" });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(payload.detail ?? "Demo kullanıcıları hazırlanamadı.");
-
-        operatorIdentity.value = payload.operatorUser;
-        operatorAccessToken = payload.operatorToken;
-        approvalToken.value = payload.approverToken;
-        managementToken.value = payload.administratorToken;
-        updateApprovalActions();
-        demoSessionStatus.textContent = `${payload.operatorUser} işlemi başlatacak; ${payload.approverUser} onaylayacak.`;
-        demoSessionStatus.className = "validation-status validation-status-success";
-        demoSessionStatus.hidden = false;
-        demoSessionButton.textContent = "Demo kullanıcıları hazır";
-        setWorkflowStep(1, "complete");
-        return true;
-    } catch (error) {
-        demoSessionStatus.textContent = error.message || getNetworkErrorMessage();
-        demoSessionStatus.className = "validation-status validation-status-error";
-        demoSessionStatus.hidden = false;
-        demoSessionButton.textContent = "Tekrar dene";
-        setWorkflowStep(1, "error");
-        return false;
-    } finally {
-        demoSessionButton.disabled = false;
-    }
-}
-
-async function preparePresentation() {
-    const sessionReady = await prepareDemoSession();
-    if (!sessionReady) return;
-
-    await loadDemoFiles(false);
-    demoSessionButton.textContent = "Sunum hazır";
-    demoSessionStatus.textContent = "operator-1 ve approver-1 hazır; örnek dosyalar seçildi. Validasyon yaparak başlayabilirsiniz.";
-}
-
-async function loadDemoFiles(useInvalidFirstFile) {
-    const activeButton = useInvalidFirstFile ? loadInvalidDemoFilesButton : loadValidDemoFilesButton;
-    activeButton.disabled = true;
-    activeButton.textContent = "Yükleniyor";
-    hideAlert();
-    try {
-        const firstFileKey = useInvalidFirstFile
-            ? "invalid-comparison-file"
-            : "comparison-file-1";
-        const [firstFile, secondFile] = await Promise.all([
-            downloadDemoFile(firstFileKey),
-            downloadDemoFile("comparison-file-2")
-        ]);
-        assignFileToInput(branchFileInput, firstFile);
-        assignFileToInput(bankFileInput, secondFile);
-        updateFileName(branchFileInput, branchFileName);
-        updateFileName(bankFileInput, bankFileName);
-        updateFileSelectionWorkflow();
-        showValidationStatus(
-            useInvalidFirstFile
-                ? "Hatalı örnek dosyalar yüklendi. Validasyon yaparak hataları görüntüleyebilirsiniz."
-                : "Geçerli örnek dosyalar yüklendi. Validasyon adımıyla devam edebilirsiniz.",
-            "success");
-    } catch (error) {
-        showAlert(error.message || "Örnek dosyalar yüklenemedi.");
-    } finally {
-        activeButton.disabled = false;
-        activeButton.textContent = useInvalidFirstFile
-            ? "Hatalı örneği yükle"
-            : "Geçerli örneği yükle";
-    }
-}
-
-async function downloadDemoFile(fileKey) {
-    const response = await fetch(`/api/demo-files/${fileKey}`);
-    if (!response.ok) throw new Error("Örnek dosya indirilemedi.");
-    const blob = await response.blob();
-    const disposition = response.headers.get("Content-Disposition") ?? "";
-    const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
-    const fileName = encodedName ? decodeURIComponent(encodedName) : `${fileKey}.csv`;
-    return new File([blob], fileName, { type: "text/csv" });
-}
-
-function assignFileToInput(input, file) {
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    input.files = transfer.files;
 }
 
 function setBusy(isBusy, label = "Karşılaştırılıyor") {

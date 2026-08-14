@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mutabakat Yönetimi</title>
-    <link rel="stylesheet" href="/styles.css?v=20260814-1">
+    <link rel="stylesheet" href="/styles.css?v=20260814-2">
 </head>
 <body>
     <main class="shell">
@@ -33,23 +33,6 @@
                 <li data-workflow-step="5"><strong>5</strong><span>Sonucu onayla</span></li>
             </ol>
 
-            <section class="demo-access-panel" aria-labelledby="demo-access-title">
-                <div>
-                    <h2 id="demo-access-title">Sunum Kullanıcıları</h2>
-                    <span class="section-note">İşlemi başlatan ve onaylayan iki farklı demo kullanıcısını hazırlar.</span>
-                </div>
-                <button id="demo-session-button" type="button">Sunumu tek tıkla hazırla</button>
-                <div class="demo-file-links" aria-label="Örnek dosyalar">
-                    <span>Örnek dosyalar:</span>
-                    <button id="load-valid-demo-files" type="button" class="secondary">Geçerli örneği yükle</button>
-                    <button id="load-invalid-demo-files" type="button" class="secondary">Hatalı örneği yükle</button>
-                    <a href="/api/demo-files/comparison-file-1" download>Dosya 1</a>
-                    <a href="/api/demo-files/comparison-file-2" download>Dosya 2</a>
-                    <a href="/api/demo-files/invalid-comparison-file" download>Hatalı dosya</a>
-                </div>
-                <div id="demo-session-status" class="validation-status" role="status" hidden></div>
-            </section>
-
             <section class="management-access-panel advanced-configuration" aria-labelledby="management-access-title" hidden>
                 <div>
                     <h2 id="management-access-title">Yönetim Erişimi</h2>
@@ -73,8 +56,8 @@
                 </div>
                 <label class="operator-identity-field">
                     <span>İşlemi başlatan kullanıcı</span>
-                    <input id="operator-identity" type="text" maxlength="200" value="operator-1" autocomplete="off" readonly required>
-                    <small>Demo oturumu hazırlandığında güvenli erişim anahtarı otomatik kullanılır.</small>
+                    <input id="operator-identity" type="text" maxlength="200" autocomplete="off" placeholder="Kullanıcı adını girin" required>
+                    <small>Dosyaları yükleyen ve karşılaştırmayı başlatan kullanıcıyı yazın.</small>
                 </label>
                 <div class="file-grid">
                     <label class="file-drop" for="branch-file">
@@ -389,6 +372,6 @@
         </section>
     </main>
 
-    <script src="/app.js?v=20260814-1"></script>
+    <script src="/app.js?v=20260814-2"></script>
 </body>
 </html>
