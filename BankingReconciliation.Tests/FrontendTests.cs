@@ -252,5 +252,8 @@ public class FrontendTests : IClassFixture<BankingReconciliationWebApplicationFa
         Assert.Contains(".audit-list", styles);
         Assert.Contains(".audit-retention-status-degraded", styles);
         Assert.Contains(".audit-state-grid", styles);
+        Assert.Contains("button:disabled", styles);
+        Assert.Contains("cursor: not-allowed", styles);
+        Assert.DoesNotContain("cursor: wait", styles);
     }
 }
