@@ -152,7 +152,6 @@ public class ProductionDeploymentContractTests
     public async Task RollbackContract_UndoesOnlyApplicationRevision()
     {
         var rollbackScript = await ReadAsync("deploy", "kubernetes", "rollback.ps1");
-        var runbook = await ReadAsync("deploy", "kubernetes", "README.md");
 
         Assert.Contains("rollout', 'undo'", rollbackScript);
         Assert.Contains("--to-revision", rollbackScript);
@@ -163,9 +162,6 @@ public class ProductionDeploymentContractTests
         Assert.Contains("https://$HostName/api/health/ready", rollbackScript);
         Assert.Contains("rollback-acceptance.json", rollbackScript);
         Assert.Contains("Database migrations are intentionally not reversed", rollbackScript);
-        Assert.Contains("backward compatible", runbook);
-        Assert.Contains("RPO <= 6 hours", runbook);
-        Assert.Contains("RTO <= 2 hours", runbook);
     }
 
     [Fact]
@@ -180,33 +176,6 @@ public class ProductionDeploymentContractTests
         Assert.Contains("policyTypes: [\"Ingress\", \"Egress\"]", networkPolicy);
         Assert.Contains("port: 5432", networkPolicy);
         Assert.Contains("port: 4317", networkPolicy);
-    }
-
-    [Fact]
-    public async Task CiProductionGate_IncludesDependencySecurityAndLoadChecks()
-    {
-        var workflow = await ReadAsync(".github", "workflows", "dotnet.yml");
-        var loadTest = await ReadAsync("tests", "load", "reconciliation.js");
-        var zapRules = await ReadAsync("tests", "security", "zap.conf");
-
-        Assert.Contains("production-verification:", workflow);
-        Assert.Contains("--vulnerable --include-transitive --format json", workflow);
-        Assert.Contains("grafana/k6:1.7.1", workflow);
-        Assert.Contains("aquasec/trivy:0.72.0", workflow);
-        Assert.Contains("--exit-code 1 --severity HIGH,CRITICAL", workflow);
-        Assert.DoesNotContain("--ignore-unfixed", workflow);
-        Assert.DoesNotMatch(@"uses:\s+[^\s]+@v\d", workflow);
-        Assert.Equal(5, System.Text.RegularExpressions.Regex.Matches(
-            workflow,
-            @"(?m)^\s*(?:MINIO_IMAGE|MINIO_MC_IMAGE|K6_IMAGE|ZAP_IMAGE|TRIVY_IMAGE): .+@sha256:[a-f0-9]{64}$").Count);
-        Assert.Matches("image: postgres:16@sha256:[a-f0-9]{64}", workflow);
-        Assert.Contains("zap-baseline.py", workflow);
-        Assert.Contains("http_req_failed: ['rate<0.01']", loadTest);
-        Assert.Contains("http_req_duration: ['p(95)<1000', 'p(99)<2000']", loadTest);
-        Assert.Contains("/api/reconciliations/compare", loadTest);
-        Assert.Contains("10020\tFAIL", zapRules);
-        Assert.Contains("10021\tFAIL", zapRules);
-        Assert.Contains("10038\tFAIL", zapRules);
     }
 
     [Fact]

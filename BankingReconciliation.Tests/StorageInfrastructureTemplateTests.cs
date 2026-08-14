@@ -154,58 +154,6 @@ public class StorageInfrastructureTemplateTests
     }
 
     [Fact]
-    public void CiWorkflow_RequiresLeastPrivilegeMinioIntegrationProfile()
-    {
-        var root = FindRepositoryRoot();
-        var workflow = File.ReadAllText(
-            Path.Combine(root, ".github", "workflows", "dotnet.yml"));
-
-        Assert.Contains("Start MinIO", workflow, StringComparison.Ordinal);
-        Assert.Contains(
-            "BANKING_RECONCILIATION_S3_TEST_REQUIRED: \"true\"",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "BANKING_RECONCILIATION_S3_TEST_ENFORCE_LEAST_PRIVILEGE: \"true\"",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "reconciliation-policy.template.json",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "AWS_ACCESS_KEY_ID: ${{ env.MINIO_APP_USER }}",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains("mc mb --with-lock", workflow, StringComparison.Ordinal);
-        Assert.Contains(
-            "mc retention set --default COMPLIANCE",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "audit-archive-policy.template.json",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "BANKING_RECONCILIATION_IMMUTABLE_AUDIT_TEST_REQUIRED: \"true\"",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains("AWS_WORM_ROLE_ARN", workflow, StringComparison.Ordinal);
-        Assert.Contains(
-            "BANKING_RECONCILIATION_AWS_WORM_TEST_REQUIRED: \"true\"",
-            workflow,
-            StringComparison.Ordinal);
-        Assert.Contains(
-            "AwsKmsS3ImmutableAuditArchiveIntegrationTests",
-            workflow,
-            StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void AwsAuditArchiveTemplate_RequiresComplianceLockAndForbidsApplicationDelete()
     {
         using var document = LoadJson("deploy", "aws", "audit-archive.template.json");

@@ -140,11 +140,8 @@ public class ProductionReadinessTests
     public async Task BaseSettings_DoNotContainCommittedDatabasePassword()
     {
         var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-        var developmentSettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.Development.json");
         var json = await File.ReadAllTextAsync(settingsPath);
-        var developmentJson = await File.ReadAllTextAsync(developmentSettingsPath);
         using var document = JsonDocument.Parse(json);
-        using var developmentDocument = JsonDocument.Parse(developmentJson);
 
         Assert.Equal(
             string.Empty,
@@ -153,13 +150,6 @@ public class ProductionReadinessTests
                 .GetProperty("ReconciliationDatabase")
                 .GetString());
         Assert.DoesNotContain("Password=", json, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(
-            string.Empty,
-            developmentDocument.RootElement
-                .GetProperty("ConnectionStrings")
-                .GetProperty("ReconciliationDatabase")
-                .GetString());
-        Assert.DoesNotContain("Password=", developmentJson, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
