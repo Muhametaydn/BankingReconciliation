@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-reconciliation-config
+  namespace: banking-reconciliation
+data:
+  ASPNETCORE_ENVIRONMENT: "__ASPNETCORE_ENVIRONMENT__"
+  ASPNETCORE_HTTP_PORTS: "8080"
+  AllowedHosts: "__HOST__"
+  Authentication__Authority: "__AUTHORITY__"
+  Authentication__Audience: "__AUTHENTICATION_AUDIENCE__"
+  Authentication__RequireHttpsMetadata: "true"
+  ReconciliationProduction__DeploymentVersion: "__VERSION__"
+  ReconciliationProduction__ApplyDatabaseMigrationsOnStartup: "false"
+  ReconciliationProduction__KnownProxyNetworks__0: "__KNOWN_PROXY_NETWORK__"
+  ReconciliationUpload__TemporaryStorageMode: "S3Compatible"
+  ReconciliationUpload__S3BucketName: "__UPLOAD_BUCKET__"
+  ReconciliationUpload__S3Prefix: "banking-reconciliation/uploads"
+  ReconciliationUpload__S3Region: "__AWS_REGION__"
+  ReconciliationUpload__S3ExpectedBucketOwner: "__EXPECTED_OWNER__"
+  ReconciliationObservability__OpenTelemetryEnabled: "true"
+  ReconciliationObservability__OtlpEndpoint: "__OTLP_ENDPOINT__"

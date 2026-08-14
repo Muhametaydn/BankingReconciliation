@@ -1,0 +1,12 @@
+.git
+.github
+.vs
+.agents
+**/bin
+**/obj
+**/*.user
+**/*.suo
+**/TestResults
+deploy
+README.md
+NEXT_STEPS.md

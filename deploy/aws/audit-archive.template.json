@@ -1,0 +1,172 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Compliance-locked immutable audit archive for Banking Reconciliation.",
+  "Parameters": {
+    "BucketName": {
+      "Type": "String",
+      "Description": "Globally unique archive bucket name. Object Lock is enabled at creation."
+    },
+    "ObjectPrefix": {
+      "Type": "String",
+      "Default": "banking-reconciliation/audit-archive",
+      "MinLength": 1
+    },
+    "ApplicationRoleArn": {
+      "Type": "String",
+      "Description": "IAM role assumed by the Banking Reconciliation workload."
+    },
+    "SigningKeyAlias": {
+      "Type": "String",
+      "Default": "alias/banking-reconciliation-audit-signing",
+      "AllowedPattern": "alias/[a-zA-Z0-9/_-]+"
+    },
+    "ComplianceRetentionDays": {
+      "Type": "Number",
+      "Default": 3650,
+      "MinValue": 1
+    },
+    "ArchiveExpirationDays": {
+      "Type": "Number",
+      "Default": 3651,
+      "MinValue": 2,
+      "Description": "Must remain greater than ComplianceRetentionDays."
+    }
+  },
+  "Resources": {
+    "AuditSigningKey": {
+      "Type": "AWS::KMS::Key",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "Description": "Asymmetric RSA signing key for immutable Banking Reconciliation audit archives.",
+        "KeySpec": "RSA_3072",
+        "KeyUsage": "SIGN_VERIFY",
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "AllowAccountAdministration",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": { "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root" }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Sid": "AllowApplicationSignAndVerify",
+              "Effect": "Allow",
+              "Principal": { "AWS": { "Ref": "ApplicationRoleArn" } },
+              "Action": [ "kms:Sign", "kms:Verify" ],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "AuditSigningKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": { "Ref": "SigningKeyAlias" },
+        "TargetKeyId": { "Ref": "AuditSigningKey" }
+      }
+    },
+    "AuditArchiveBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": { "Ref": "BucketName" },
+        "ObjectLockEnabled": true,
+        "ObjectLockConfiguration": {
+          "ObjectLockEnabled": "Enabled",
+          "Rule": {
+            "DefaultRetention": {
+              "Mode": "COMPLIANCE",
+              "Days": { "Ref": "ComplianceRetentionDays" }
+            }
+          }
+        },
+        "VersioningConfiguration": { "Status": "Enabled" },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            { "ServerSideEncryptionByDefault": { "SSEAlgorithm": "AES256" } }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [ { "ObjectOwnership": "BucketOwnerEnforced" } ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireAuditArchivesAfterComplianceRetention",
+              "Status": "Enabled",
+              "Prefix": { "Fn::Sub": "${ObjectPrefix}/" },
+              "ExpirationInDays": { "Ref": "ArchiveExpirationDays" },
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": { "Ref": "ArchiveExpirationDays" }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "AuditArchiveBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": { "Ref": "AuditArchiveBucket" },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                { "Fn::GetAtt": [ "AuditArchiveBucket", "Arn" ] },
+                { "Fn::Sub": "${AuditArchiveBucket.Arn}/*" }
+              ],
+              "Condition": { "Bool": { "aws:SecureTransport": "false" } }
+            },
+            {
+              "Sid": "DenyWritesWithoutComplianceMode",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": { "Fn::Sub": "${AuditArchiveBucket.Arn}/${ObjectPrefix}/*" },
+              "Condition": {
+                "StringNotEquals": { "s3:object-lock-mode": "COMPLIANCE" }
+              }
+            },
+            {
+              "Sid": "AllowApplicationArchiveWrites",
+              "Effect": "Allow",
+              "Principal": { "AWS": { "Ref": "ApplicationRoleArn" } },
+              "Action": [
+                "s3:GetObject",
+                "s3:GetObjectRetention",
+                "s3:PutObject",
+                "s3:PutObjectRetention"
+              ],
+              "Resource": { "Fn::Sub": "${AuditArchiveBucket.Arn}/${ObjectPrefix}/*" }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "BucketName": { "Value": { "Ref": "AuditArchiveBucket" } },
+    "ObjectPrefix": { "Value": { "Ref": "ObjectPrefix" } },
+    "BucketOwnerAccountId": { "Value": { "Ref": "AWS::AccountId" } },
+    "SigningKeyArn": { "Value": { "Fn::GetAtt": [ "AuditSigningKey", "Arn" ] } },
+    "SigningKeyAlias": { "Value": { "Ref": "SigningKeyAlias" } }
+  }
+}

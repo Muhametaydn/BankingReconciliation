@@ -1,0 +1,67 @@
+# Build output
+bin/
+obj/
+
+# Private project notes and generated documentation
+*.md
+.agents/
+.codex/
+.local-ci/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Local development settings and secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.Local.json
+secrets.json
+secrets.*.json
+credentials.json
+credentials.*.json
+launchSettings.local.json
+
+# Keys, certificates and signing material
+*.key
+*.pem
+*.pfx
+*.p12
+*.cer
+*.crt
+*.jks
+
+# Cloud, cluster and infrastructure credentials/state
+kubeconfig
+kubeconfig.*
+.kube/
+.aws/
+.azure/
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Local databases, exports and backups
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.bak
+*.dump
+
+# Test results and coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+Desktop.ini

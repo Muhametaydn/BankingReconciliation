@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mutabakat Yönetimi</title>
+    <link rel="stylesheet" href="/styles.css?v=20260812-8">
+</head>
+<body>
+    <main class="shell">
+        <section class="workspace" aria-labelledby="page-title">
+            <header class="topbar">
+                <div class="brand-lockup">
+                    <span class="brand-mark" aria-hidden="true"><span></span></span>
+                    <div>
+                        <p class="eyebrow">CSV/TXT mutabakatı · Finansal kontrol merkezi</p>
+                        <h1 id="page-title">Mutabakat Yönetimi</h1>
+                        <p class="hero-subtitle">İki veri kaynağını güvenle doğrulayın, karşılaştırın ve onaylayın.</p>
+                    </div>
+                </div>
+                <div class="topbar-actions">
+                    <span class="secure-badge"><span aria-hidden="true"></span> Güvenli işlem alanı</span>
+                    <button id="advanced-settings-toggle" type="button" class="secondary" aria-expanded="false">Gelişmiş ayarları göster</button>
+                    <a class="swagger-link" href="/swagger">Swagger</a>
+                </div>
+            </header>
+
+            <ol class="workflow-guide" aria-label="Sunum akışı">
+                <li data-workflow-step="1"><strong>1</strong><span>Kullanıcıları hazırla</span></li>
+                <li data-workflow-step="2"><strong>2</strong><span>Dosyaları seç</span></li>
+                <li data-workflow-step="3"><strong>3</strong><span>Validasyon yap</span></li>
+                <li data-workflow-step="4"><strong>4</strong><span>Karşılaştır</span></li>
+                <li data-workflow-step="5"><strong>5</strong><span>Sonucu onayla</span></li>
+            </ol>
+
+            <section class="demo-access-panel" aria-labelledby="demo-access-title">
+                <div>
+                    <h2 id="demo-access-title">Sunum Kullanıcıları</h2>
+                    <span class="section-note">İşlemi başlatan ve onaylayan iki farklı demo kullanıcısını hazırlar.</span>
+                </div>
+                <button id="demo-session-button" type="button">Sunumu tek tıkla hazırla</button>
+                <div class="demo-file-links" aria-label="Örnek dosyalar">
+                    <span>Örnek dosyalar:</span>
+                    <button id="load-valid-demo-files" type="button" class="secondary">Geçerli örneği yükle</button>
+                    <button id="load-invalid-demo-files" type="button" class="secondary">Hatalı örneği yükle</button>
+                    <a href="/api/demo-files/comparison-file-1" download>Dosya 1</a>
+                    <a href="/api/demo-files/comparison-file-2" download>Dosya 2</a>
+                    <a href="/api/demo-files/invalid-comparison-file" download>Hatalı dosya</a>
+                </div>
+                <div id="demo-session-status" class="validation-status" role="status" hidden></div>
+            </section>
+
+            <section class="management-access-panel advanced-configuration" aria-labelledby="management-access-title" hidden>
+                <div>
+                    <h2 id="management-access-title">Yönetim Erişimi</h2>
+                    <span class="section-note">Kaynak, şema ve karşılaştırma ayarı değişiklikleri için gereklidir.</span>
+                </div>
+                <label class="management-token-field">
+                    <span>Yönetim erişim anahtarı</span>
+                    <input id="management-token" type="password" autocomplete="off" spellcheck="false" placeholder="JWT erisim anahtari">
+                    <small>Yalnizca bu sayfada kullanilir; tarayicida kaydedilmez.</small>
+                </label>
+            </section>
+
+            <form id="compare-form" class="compare-panel">
+                <div class="compare-heading">
+                    <div class="section-icon" aria-hidden="true">⇄</div>
+                    <div>
+                        <h2>Yeni Karşılaştırma</h2>
+                        <span class="section-note">Dosyalarınızı seçin, doğrulayın ve karşılaştırmayı başlatın.</span>
+                    </div>
+                    <span class="format-badge">CSV · TXT</span>
+                </div>
+                <label class="operator-identity-field">
+                    <span>İşlemi başlatan kullanıcı</span>
+                    <input id="operator-identity" type="text" maxlength="200" value="operator-1" autocomplete="off" readonly required>
+                    <small>Demo oturumu hazırlandığında güvenli erişim anahtarı otomatik kullanılır.</small>
+                </label>
+                <div class="file-grid">
+                    <label class="file-drop" for="branch-file">
+                        <span class="file-number">01</span>
+                        <span class="file-label">Karşılaştırma Dosyası 1</span>
+                        <span id="branch-file-name" class="file-name">Dosya seçilmedi</span>
+                        <span class="file-upload-cta">Dosya seç</span>
+                        <span class="file-upload-hint">CSV veya TXT · En fazla 5 MB</span>
+                        <input id="branch-file" name="branchFile" type="file" accept=".csv,.txt,text/csv,text/plain" required>
+                    </label>
+
+                    <label class="file-drop" for="bank-file">
+                        <span class="file-number">02</span>
+                        <span class="file-label">Karşılaştırma Dosyası 2</span>
+                        <span id="bank-file-name" class="file-name">Dosya seçilmedi</span>
+                        <span class="file-upload-cta">Dosya seç</span>
+                        <span class="file-upload-hint">CSV veya TXT · En fazla 5 MB</span>
+                        <input id="bank-file" name="bankFile" type="file" accept=".csv,.txt,text/csv,text/plain" required>
+                    </label>
+                </div>
+
+                <div class="actions">
+                    <div class="primary-actions">
+                        <button id="validate-button" type="button" class="secondary">Validasyon yap</button>
+                        <button id="compare-button" type="submit">Karşılaştır</button>
+                        <button id="file-queue-button" type="button" class="secondary">Arka planda karşılaştır</button>
+                    </div>
+                    <button id="reset-button" type="button" class="secondary quiet-button">Temizle</button>
+                </div>
+                <div id="validation-status" class="validation-status" role="status" hidden></div>
+                <div id="validation-details" class="validation-details" hidden>
+                    <div class="validation-summary-row">
+                        <strong>Validasyon notları</strong>
+                        <span id="validation-error-count"></span>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Dosya</th><th>Satır</th><th>Kolon</th><th>Kural</th><th>Açıklama</th></tr></thead>
+                            <tbody id="validation-errors-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </form>
+
+            <div id="alert" class="alert" role="alert" hidden></div>
+
+            <section class="sources-section advanced-configuration" aria-labelledby="sources-title" hidden>
+                <div class="results-header">
+                    <div>
+                        <h2 id="sources-title">Veri Kaynaklari</h2>
+                        <span class="section-note">Karşılaştırılacak iki veri kaynağının tanımları.</span>
+                    </div>
+                    <div class="results-actions">
+                        <button id="database-queue-button" type="button" class="secondary" disabled>Arka planda çalıştır</button>
+                        <button id="database-compare-button" type="button" disabled>Veri kaynaklarını karşılaştır</button>
+                    </div>
+                </div>
+                <div id="sources-status" class="validation-status" hidden></div>
+                <div id="sources-list" class="sources-list">
+                    <p class="empty-state sources-empty">Veri kaynaklari yukleniyor.</p>
+                </div>
+            </section>
+
+            <section class="schema-section advanced-configuration" aria-labelledby="schema-title" hidden>
+                <div class="results-header">
+                    <div>
+                        <h2 id="schema-title">Dosya Şeması</h2>
+                        <span class="section-note">Validasyon ve karşılaştırma için beklenen kolonlar.</span>
+                    </div>
+                    <div class="results-actions">
+                        <button id="schema-add-button" type="button" class="secondary">Kolon ekle</button>
+                        <button id="schema-save-button" type="button" class="secondary">Şemayı uygula</button>
+                    </div>
+                </div>
+                <div id="schema-status" class="validation-status" hidden></div>
+                <div id="schema-list" class="schema-list">
+                    <p class="empty-state schema-empty">Dosya şeması yükleniyor.</p>
+                </div>
+            </section>
+
+            <section class="settings-section advanced-configuration" aria-labelledby="comparison-settings-title" hidden>
+                <div class="results-header">
+                    <div>
+                        <h2 id="comparison-settings-title">Karşılaştırma Ayarları</h2>
+                        <span class="section-note">Alanları listeden seçin; virgülle teknik alan adı yazmanız gerekmez.</span>
+                    </div>
+                    <button id="comparison-settings-save-button" type="button" class="secondary">Ayarlari uygula</button>
+                </div>
+                <div id="comparison-settings-status" class="validation-status" hidden></div>
+                <div id="comparison-settings-form" class="settings-grid">
+                    <label class="settings-check"><input id="normalize-code-case" type="checkbox"><span>Büyük/küçük harf farkını yok say</span></label>
+                    <label class="settings-field"><span>Sonuç politikası</span><select id="require-exact-match"><option value="false">Farkları raporla, işlemi tamamla</option><option value="true">Dosyalar birebir aynı değilse başarısız say</option></select></label>
+                    <label class="settings-field"><span>Adet toleransı</span><input id="quantity-tolerance" type="number" min="0" step="any" value="0"><small>0 seçilirse birebir eşitlik aranır.</small></label>
+                    <label class="settings-field"><span>Tutar toleransı</span><input id="amount-tolerance" type="number" min="0" step="any" value="0"><small>Bu değerin altındaki farklar eşleşmiş sayılır.</small></label>
+                    <label class="settings-check"><input id="trim-text-values" type="checkbox"><span>Baş ve sondaki boşlukları yok say</span></label>
+                    <label class="settings-field"><span>Kayıtları eşleştiren alanlar</span><select id="matching-fields" multiple size="6"></select><small>Birden fazla alan seçebilirsiniz.</small></label>
+                    <label class="settings-field"><span>Farkı kontrol edilecek alanlar</span><select id="comparison-fields" multiple size="6"></select><small>Sayısal alanlar önerilir.</small></label>
+                    <label class="settings-field"><span>Sonuç tablosunda gösterilecek alanlar</span><select id="result-fields" multiple size="6"></select></label>
+                    <label class="settings-field"><span>Dosya 1 kod boşlukları</span><select id="trim-branch-code"><option value="">Genel ayar</option><option value="true">Temizle</option><option value="false">Koru</option></select></label>
+                    <label class="settings-field"><span>Fon kodu bosluklari</span><select id="trim-fund-code"><option value="">Genel ayar</option><option value="true">Temizle</option><option value="false">Koru</option></select></label>
+                    <label class="settings-field"><span>İşlem numarası boşlukları</span><select id="trim-transaction-number"><option value="">Genel ayar</option><option value="true">Temizle</option><option value="false">Koru</option></select></label>
+                    <label class="settings-field"><span>Adet ondalik</span><input id="quantity-decimal-places" type="number" min="0" max="10"></label>
+                    <label class="settings-field"><span>Dosya 1 adet ondalık</span><input id="branch-quantity-decimal-places" type="number" min="0" max="10"></label>
+                    <label class="settings-field"><span>Dosya 2 adet ondalık</span><input id="bank-quantity-decimal-places" type="number" min="0" max="10"></label>
+                    <label class="settings-field"><span>Tutar ondalik</span><input id="amount-decimal-places" type="number" min="0" max="10"></label>
+                    <label class="settings-field"><span>Dosya 1 tutar ondalık</span><input id="branch-amount-decimal-places" type="number" min="0" max="10"></label>
+                    <label class="settings-field"><span>Dosya 2 tutar ondalık</span><input id="bank-amount-decimal-places" type="number" min="0" max="10"></label>
+                    <section class="mapping-editor settings-wide" data-mapping-editor="branchCodeMappings"><h3>Şube/kaynak kodu eşlemeleri</h3><div class="mapping-rows"></div><button type="button" class="secondary" data-add-mapping="branchCodeMappings">Eşleme ekle</button></section>
+                    <section class="mapping-editor settings-wide" data-mapping-editor="fundCodeMappings"><h3>Fon kodu eşlemeleri</h3><div class="mapping-rows"></div><button type="button" class="secondary" data-add-mapping="fundCodeMappings">Eşleme ekle</button></section>
+                    <section class="mapping-editor settings-wide" data-mapping-editor="transactionNumberMappings"><h3>İşlem numarası eşlemeleri</h3><div class="mapping-rows"></div><button type="button" class="secondary" data-add-mapping="transactionNumberMappings">Eşleme ekle</button></section>
+                    <section class="mapping-editor settings-wide" data-mapping-editor="fieldMappings"><h3>Diğer alan eşlemeleri</h3><div class="mapping-rows"></div><button type="button" class="secondary" data-add-mapping="fieldMappings">Eşleme ekle</button></section>
+                </div>
+            </section>
+
+            <section class="summary-grid" aria-label="Mutabakat ozeti">
+                <article class="metric">
+                    <span>Dosya 1</span>
+                    <strong id="total-branch">0</strong>
+                </article>
+                <article class="metric">
+                    <span>Dosya 2</span>
+                    <strong id="total-bank">0</strong>
+                </article>
+                <article class="metric matched">
+                    <span>Eşleşen</span>
+                    <strong id="matched-count">0</strong>
+                </article>
+                <article class="metric mismatch">
+                    <span>Farklı</span>
+                    <strong id="mismatch-count">0</strong>
+                </article>
+                <article class="metric branch-only">
+                    <span>Yalnızca Dosya 1</span>
+                    <strong id="only-branch-count">0</strong>
+                </article>
+                <article class="metric bank-only">
+                    <span>Yalnızca Dosya 2</span>
+                    <strong id="only-bank-count">0</strong>
+                </article>
+                <article id="policy-metric" class="metric">
+                    <span>Politika sonucu</span>
+                    <strong id="policy-result">-</strong>
+                </article>
+            </section>
+
+            <section id="comparison-narrative" class="comparison-narrative" aria-labelledby="comparison-narrative-title" hidden>
+                <div>
+                    <h2 id="comparison-narrative-title">Yönetici Özeti</h2>
+                    <p id="comparison-narrative-text"></p>
+                </div>
+                <button id="copy-narrative-button" type="button" class="secondary">Özeti kopyala</button>
+                <div id="copy-narrative-status" class="validation-status" role="status" hidden></div>
+            </section>
+
+            <section class="results-section" aria-labelledby="results-title">
+                <div class="results-header">
+                    <div>
+                        <h2 id="results-title">Sonuçlar</h2>
+                        <span id="selected-batch-info" class="section-note">Henuz mutabakat secilmedi.</span>
+                    </div>
+                    <div class="results-actions">
+                        <label class="filter-control" for="status-filter">
+                            <span>Durum</span>
+                            <select id="status-filter">
+                                <option value="All">Tüm kayıtlar</option>
+                                <option value="Matched">Eşleşen</option>
+                                <option value="Mismatch">Farklı</option>
+                                <option value="OnlyInBranch">Yalnızca Dosya 1</option>
+                                <option value="OnlyInBank">Yalnızca Dosya 2</option>
+                            </select>
+                        </label>
+                        <span id="result-count">0 kayıt</span>
+                        <button id="export-button" type="button" class="secondary" disabled>Excel indir</button>
+                    </div>
+                </div>
+
+                <section class="approval-panel" aria-labelledby="approval-title">
+                    <div class="approval-heading">
+                        <div>
+                            <h2 id="approval-title">Onay Karari</h2>
+                            <span id="approval-decision-meta" class="section-note">Onay icin tamamlanmis bir mutabakat secin.</span>
+                        </div>
+                        <span id="approval-status" class="approval-badge NotApplicable">Uygulanamaz</span>
+                    </div>
+                    <div class="approval-controls">
+                        <label class="approval-field approval-token-field">
+                            <span>Onay erisim anahtari</span>
+                            <input id="approval-token" type="password" autocomplete="off" spellcheck="false" placeholder="JWT erisim anahtari">
+                            <small>Yalnizca bu ekrandaki karar icin kullanilir; tarayicida kaydedilmez.</small>
+                        </label>
+                        <label class="approval-field approval-comment-field">
+                            <span>Karar notu</span>
+                            <textarea id="approval-comment" rows="3" maxlength="1000" placeholder="Red icin gerekce zorunludur."></textarea>
+                        </label>
+                        <div class="approval-actions">
+                            <button id="approve-button" type="button" disabled>Onayla</button>
+                            <button id="reject-button" type="button" class="danger" disabled>Reddet</button>
+                        </div>
+                    </div>
+                    <div id="approval-feedback" class="validation-status" role="status" hidden></div>
+                </section>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr id="results-head">
+                                <th>Durum</th>
+                                <th>Kaynak kodu</th>
+                                <th>Fon kodu</th>
+                                <th>İşlem numarası</th>
+                                <th>Adet farkı</th>
+                                <th>Tutar farkı</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body">
+                            <tr>
+                                <td colspan="6" class="empty-state">Karşılaştırma sonucu burada görünecek.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="history-section" aria-labelledby="history-title">
+                <div class="results-header">
+                    <div>
+                        <h2 id="history-title">Geçmiş Mutabakatlar</h2>
+                        <span class="section-note">Tamamlanan ve arka planda çalışan işlemler burada listelenir.</span>
+                    </div>
+                    <button id="refresh-history-button" type="button" class="secondary">Yenile</button>
+                </div>
+
+                <form id="history-filter-form" class="history-filters">
+                    <label>
+                        <span>Ara</span>
+                        <input id="history-search" type="search" placeholder="Dosya veya hata" autocomplete="off">
+                    </label>
+                    <label>
+                        <span>Baslangic</span>
+                        <input id="history-from" type="date">
+                    </label>
+                    <label>
+                        <span>Bitis</span>
+                        <input id="history-to" type="date">
+                    </label>
+                    <label>
+                        <span>Durum</span>
+                        <select id="history-status">
+                            <option value="">Tumu</option>
+                            <option value="Completed">Tamamlandı</option>
+                            <option value="Failed">Hatalı</option>
+                            <option value="Queued">Kuyrukta</option>
+                            <option value="Processing">İşleniyor</option>
+                        </select>
+                    </label>
+                    <button type="submit">Filtrele</button>
+                    <button id="history-clear-button" type="button" class="secondary">Temizle</button>
+                </form>
+
+                <div id="history-list" class="history-list">
+                    <p class="empty-state history-empty">Geçmiş mutabakat kaydı yok.</p>
+                </div>
+                <div class="history-pagination">
+                    <button id="history-previous-button" type="button" class="secondary">Onceki</button>
+                    <span id="history-page-info">Sayfa 1</span>
+                    <button id="history-next-button" type="button" class="secondary">Sonraki</button>
+                </div>
+            </section>
+
+            <section class="audit-section advanced-configuration" aria-labelledby="audit-title" hidden>
+                <div class="results-header">
+                    <div>
+                        <h2 id="audit-title">İşlem Kayıtları</h2>
+                        <span class="section-note">Onaylar ve yonetim ayari degisiklikleri burada izlenir.</span>
+                    </div>
+                    <button id="audit-refresh-button" type="button" class="secondary">Kayitlari getir</button>
+                </div>
+                <form id="audit-filter-form" class="audit-filters">
+                    <label>
+                        <span>Kullanici</span>
+                        <input id="audit-actor" type="search" placeholder="Kullanici kimligi" autocomplete="off">
+                    </label>
+                    <label>
+                        <span>İşlem</span>
+                        <select id="audit-action">
+                            <option value="">Tumu</option>
+                            <option value="ReconciliationApproved">Mutabakat onayi</option>
+                            <option value="ReconciliationRejected">Mutabakat reddi</option>
+                            <option value="SourceUpdated">Kaynak degisikligi</option>
+                            <option value="FileSchemaUpdated">Sema degisikligi</option>
+                            <option value="ComparisonSettingsUpdated">Karşılaştırma ayarı</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Kaynak turu</span>
+                        <select id="audit-resource-type">
+                            <option value="">Tumu</option>
+                            <option value="ReconciliationBatch">Mutabakat</option>
+                            <option value="ReconciliationSource">Veri kaynagi</option>
+                            <option value="FileSchema">Dosya şeması</option>
+                            <option value="ComparisonSettings">Karşılaştırma ayarları</option>
+                        </select>
+                    </label>
+                    <button type="submit">Filtrele</button>
+                </form>
+                <div id="audit-status" class="validation-status" hidden></div>
+                <div id="audit-retention-status" class="audit-retention-status" hidden></div>
+                <div id="audit-list" class="audit-list">
+                    <p class="empty-state audit-empty">Kayitlari gormek icin yonetim erisim anahtarini girin.</p>
+                </div>
+            </section>
+        </section>
+    </main>
+
+    <script src="/app.js?v=20260812-8"></script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Least-privilege S3 storage for Banking Reconciliation temporary uploads.",
+  "Parameters": {
+    "BucketName": {
+      "Type": "String",
+      "Description": "Globally unique S3 bucket name."
+    },
+    "ObjectPrefix": {
+      "Type": "String",
+      "Default": "banking-reconciliation/uploads",
+      "MinLength": 1,
+      "Description": "Object prefix without a leading or trailing slash."
+    },
+    "ApplicationRoleArn": {
+      "Type": "String",
+      "Description": "IAM role assumed by the Banking Reconciliation workload."
+    },
+    "CurrentVersionExpirationDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 2,
+      "Description": "Days before current temporary objects expire. Keep above the maximum recovery window."
+    },
+    "NoncurrentVersionExpirationDays": {
+      "Type": "Number",
+      "Default": 7,
+      "MinValue": 1,
+      "Description": "Days before noncurrent object versions expire."
+    }
+  },
+  "Resources": {
+    "ReconciliationBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BucketName": {
+          "Ref": "BucketName"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "ExpireReconciliationTemporaryObjects",
+              "Status": "Enabled",
+              "Prefix": {
+                "Fn::Sub": "${ObjectPrefix}/"
+              },
+              "ExpirationInDays": {
+                "Ref": "CurrentVersionExpirationDays"
+              },
+              "NoncurrentVersionExpiration": {
+                "NoncurrentDays": {
+                  "Ref": "NoncurrentVersionExpirationDays"
+                }
+              },
+              "AbortIncompleteMultipartUpload": {
+                "DaysAfterInitiation": 1
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ReconciliationBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ReconciliationBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "DenyInsecureTransport",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "ReconciliationBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${ReconciliationBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": "false"
+                }
+              }
+            },
+            {
+              "Sid": "AllowPrefixList",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "ApplicationRoleArn"
+                }
+              },
+              "Action": "s3:ListBucket",
+              "Resource": {
+                "Fn::GetAtt": [
+                  "ReconciliationBucket",
+                  "Arn"
+                ]
+              },
+              "Condition": {
+                "StringLike": {
+                  "s3:prefix": [
+                    {
+                      "Ref": "ObjectPrefix"
+                    },
+                    {
+                      "Fn::Sub": "${ObjectPrefix}/*"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "Sid": "AllowPrefixObjects",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Ref": "ApplicationRoleArn"
+                }
+              },
+              "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject"
+              ],
+              "Resource": {
+                "Fn::Sub": "${ReconciliationBucket.Arn}/${ObjectPrefix}/*"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "BucketName": {
+      "Value": {
+        "Ref": "ReconciliationBucket"
+      }
+    },
+    "ObjectPrefix": {
+      "Value": {
+        "Ref": "ObjectPrefix"
+      }
+    },
+    "BucketOwnerAccountId": {
+      "Value": {
+        "Ref": "AWS::AccountId"
+      }
+    }
+  }
+}

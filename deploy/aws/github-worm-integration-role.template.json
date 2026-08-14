@@ -1,0 +1,89 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "OIDC role for Banking Reconciliation GitHub Actions AWS KMS/Object Lock integration tests.",
+  "Parameters": {
+    "GitHubOidcProviderArn": {
+      "Type": "String",
+      "Description": "Existing IAM OIDC provider ARN for token.actions.githubusercontent.com."
+    },
+    "GitHubRepository": {
+      "Type": "String",
+      "Description": "Repository in owner/name format."
+    },
+    "AuditBucketArn": {
+      "Type": "String"
+    },
+    "AuditObjectPrefix": {
+      "Type": "String",
+      "Default": "banking-reconciliation/audit-integration"
+    },
+    "SigningKeyArn": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "GitHubWormIntegrationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "Description": "Short-lived GitHub OIDC identity for immutable audit integration tests.",
+        "MaxSessionDuration": 3600,
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Federated": { "Ref": "GitHubOidcProviderArn" }
+              },
+              "Action": "sts:AssumeRoleWithWebIdentity",
+              "Condition": {
+                "StringEquals": {
+                  "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+                },
+                "StringLike": {
+                  "token.actions.githubusercontent.com:sub": {
+                    "Fn::Sub": "repo:${GitHubRepository}:*"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "RunImmutableAuditIntegration",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "WriteAndInspectLockedAuditObjects",
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectRetention",
+                    "s3:PutObject",
+                    "s3:PutObjectRetention"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${AuditBucketArn}/${AuditObjectPrefix}/*"
+                  }
+                },
+                {
+                  "Sid": "SignAndVerifyAuditPayloads",
+                  "Effect": "Allow",
+                  "Action": [ "kms:Sign", "kms:Verify" ],
+                  "Resource": { "Ref": "SigningKeyArn" }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "RoleArn": {
+      "Value": { "Fn::GetAtt": [ "GitHubWormIntegrationRole", "Arn" ] }
+    }
+  }
+}
