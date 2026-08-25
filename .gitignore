@@ -5,6 +5,7 @@ obj/
 # Private project notes and generated documentation
 *.md
 !README.md
+!README.tr.md
 !NEXT_STEPS.md
 !PRODUCTION_READINESS.md
 .agents/

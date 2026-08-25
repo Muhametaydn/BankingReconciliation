@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Muhametaydn/BankingReconciliation/actions/workflows/ci.yml/badge.svg)](https://github.com/Muhametaydn/BankingReconciliation/actions/workflows/ci.yml)
 
+[English](README.md) | [Türkçe](README.tr.md)
+
 Production-minded reconciliation platform for comparing branch and bank
 transactions, investigating exceptions, and recording an approval decision with
 an auditable trail.
