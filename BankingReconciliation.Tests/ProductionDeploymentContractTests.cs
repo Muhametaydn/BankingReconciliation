@@ -149,6 +149,57 @@ public class ProductionDeploymentContractTests
     }
 
     [Fact]
+    public async Task DeploymentPreflight_IsReadOnlyAndFailsClosedOnMissingDependencies()
+    {
+        var preflightScript = await ReadAsync("deploy", "kubernetes", "preflight.ps1");
+
+        Assert.Contains("PSNativeCommandUseErrorActionPreference", preflightScript);
+        Assert.Contains("No current Kubernetes context is configured", preflightScript);
+        Assert.Contains("Current Kubernetes context", preflightScript);
+        Assert.Contains("kubectl --context $KubeContext version", preflightScript);
+        Assert.Contains("docker info", preflightScript);
+        Assert.Contains("externalsecrets.external-secrets.io", preflightScript);
+        Assert.Contains("clustersecretstores.external-secrets.io", preflightScript);
+        Assert.Contains("ClusterSecretStore '$ExternalSecretStore' is not Ready", preflightScript);
+        Assert.Contains("get ingressclass nginx", preflightScript);
+        Assert.Contains("auth', 'can-i'", preflightScript);
+        Assert.Contains(".well-known/openid-configuration", preflightScript);
+        Assert.Contains("OIDC discovery issuer does not match", preflightScript);
+        Assert.DoesNotContain("kubectl --context $KubeContext apply", preflightScript);
+        Assert.DoesNotContain("kubectl --context $KubeContext delete", preflightScript);
+    }
+
+    [Fact]
+    public async Task LocalKubernetesProfile_IsIsolatedFromProductionDeployment()
+    {
+        var manifest = await ReadAsync("deploy", "kubernetes", "local.yaml");
+        var script = await ReadAsync("deploy", "kubernetes", "deploy-local.ps1");
+
+        Assert.Contains("namespace: banking-reconciliation-local", manifest);
+        Assert.Contains("value: Development", manifest);
+        Assert.Contains("value: __LOCAL_SIGNING_KEY__", manifest);
+        Assert.Contains("imagePullPolicy: Never", manifest);
+        Assert.Contains("readOnlyRootFilesystem: true", manifest);
+        Assert.Contains("runAsNonRoot: true", manifest);
+        Assert.Contains("kind: PersistentVolumeClaim", manifest);
+        Assert.Contains("claimName: banking-reconciliation-local-data", manifest);
+        Assert.Contains("emptyDir: {}", manifest);
+        Assert.DoesNotContain("ExternalSecret", manifest);
+        Assert.DoesNotContain("kind: Ingress", manifest);
+        Assert.Contains("docker-desktop", script);
+        Assert.Contains("does not match required context", script);
+        Assert.Contains("docker build --tag $Image", script);
+        Assert.Contains("RandomNumberGenerator", script);
+        Assert.Contains("ctr --namespace k8s.io images import", script);
+        Assert.Contains("Show system containers (advanced)", script);
+        Assert.Contains("rollout restart", script);
+        Assert.Contains("rollout status", script);
+        Assert.Contains("TcpListener", script);
+        Assert.Contains("127.0.0.1:$smokePort/api/health", script);
+        Assert.Contains("GetTempPath", script);
+    }
+
+    [Fact]
     public async Task RollbackContract_UndoesOnlyApplicationRevision()
     {
         var rollbackScript = await ReadAsync("deploy", "kubernetes", "rollback.ps1");

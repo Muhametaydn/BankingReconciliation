@@ -122,6 +122,8 @@ public static class ReconciliationEndpoints
         IServiceProvider serviceProvider,
         ReconciliationFileSchemaStore fileSchemaStore,
         IReconciliationFileSchemaRepository fileSchemaRepository,
+        ReconciliationComparisonOptionsStore comparisonOptionsStore,
+        IReconciliationComparisonOptionsRepository comparisonOptionsRepository,
         IReconciliationAuditRepository auditRepository)
     {
         if (!ReconciliationFileSchemaOptionsValidator.HasRequiredTransactionFields(fileSchemaOptions))
@@ -170,8 +172,18 @@ public static class ReconciliationEndpoints
             .GetService<ReconciliationDbContext>()?
             .Database.BeginTransaction();
         var beforeState = fileSchemaStore.GetOptions();
-        fileSchemaRepository.Save(fileSchemaOptions);
         var afterState = ReconciliationFileSchemaStore.Clone(fileSchemaOptions);
+        var beforeComparisonSettings = comparisonOptionsStore.GetOptions();
+        var (afterComparisonSettings, comparisonSettingsChanged) = SynchronizeComparisonSettings(
+            beforeComparisonSettings,
+            beforeState,
+            afterState);
+
+        fileSchemaRepository.Save(afterState);
+        if (comparisonSettingsChanged)
+        {
+            comparisonOptionsRepository.Save(afterComparisonSettings);
+        }
         auditRepository.Add(
             ReconciliationAuditAction.FileSchemaUpdated,
             actor,
@@ -179,10 +191,97 @@ public static class ReconciliationEndpoints
             "active",
             beforeState,
             afterState);
+        if (comparisonSettingsChanged)
+        {
+            auditRepository.Add(
+                ReconciliationAuditAction.ComparisonSettingsUpdated,
+                actor,
+                ReconciliationAuditResourceType.ComparisonSettings,
+                "active",
+                beforeComparisonSettings,
+                afterComparisonSettings);
+        }
         transaction?.Commit();
         fileSchemaStore.Update(afterState);
+        if (comparisonSettingsChanged)
+        {
+            comparisonOptionsStore.Update(afterComparisonSettings);
+        }
 
         return Results.Ok(CsvTransactionFileParser.GetSchema(afterState));
+    }
+
+    private static (ReconciliationComparisonOptions Options, bool Changed) SynchronizeComparisonSettings(
+        ReconciliationComparisonOptions currentSettings,
+        ReconciliationFileSchemaOptions previousSchema,
+        ReconciliationFileSchemaOptions updatedSchema)
+    {
+        var synchronized = ReconciliationComparisonOptionsStore.Clone(currentSettings);
+        var previousFields = previousSchema.GetEffectiveColumns()
+            .Select(column => column.Field)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var updatedColumns = updatedSchema.GetEffectiveColumns();
+        var updatedFields = updatedColumns
+            .Select(column => column.Field)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var numericFields = updatedColumns
+            .Where(column =>
+                column.Type.Equals("Decimal", StringComparison.OrdinalIgnoreCase) ||
+                column.Type.Equals("Integer", StringComparison.OrdinalIgnoreCase))
+            .Select(column => column.Field)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var addedFields = updatedColumns
+            .Where(column => !previousFields.Contains(column.Field))
+            .Select(column => column.Field)
+            .ToArray();
+
+        var comparisonFields = (synchronized.ComparisonFields.Length == 0
+                ? new[] { "Quantity", "Amount" }
+                : synchronized.ComparisonFields)
+            .Where(numericFields.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var field in addedFields.Where(numericFields.Contains))
+        {
+            if (!comparisonFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+            {
+                comparisonFields.Add(field);
+            }
+        }
+
+        var resultFields = (synchronized.ResultFields.Length == 0
+                ? new[] { "BranchCode", "FundCode", "TransactionNumber" }
+                : synchronized.ResultFields)
+            .Where(updatedFields.Contains)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        foreach (var field in addedFields)
+        {
+            if (!resultFields.Contains(field, StringComparer.OrdinalIgnoreCase))
+            {
+                resultFields.Add(field);
+            }
+        }
+
+        var fieldMappings = synchronized.FieldMappings
+            .Where(mapping => updatedFields.Contains(mapping.Key))
+            .ToDictionary(
+                mapping => mapping.Key,
+                mapping => mapping.Value,
+                StringComparer.OrdinalIgnoreCase);
+
+        var changed = !synchronized.ComparisonFields.SequenceEqual(
+                comparisonFields,
+                StringComparer.OrdinalIgnoreCase) ||
+            !synchronized.ResultFields.SequenceEqual(
+                resultFields,
+                StringComparer.OrdinalIgnoreCase) ||
+            synchronized.FieldMappings.Count != fieldMappings.Count;
+
+        synchronized.ComparisonFields = comparisonFields.ToArray();
+        synchronized.ResultFields = resultFields.ToArray();
+        synchronized.FieldMappings = fieldMappings;
+        return (synchronized, changed);
     }
 
     private static async Task<IResult> ValidateFileSchemaAsync(

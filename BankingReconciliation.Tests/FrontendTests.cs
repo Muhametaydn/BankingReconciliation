@@ -19,6 +19,8 @@ public class FrontendTests : IClassFixture<BankingReconciliationWebApplicationFa
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html", response.Content.Headers.ContentType?.MediaType);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        Assert.True(response.Headers.CacheControl?.NoCache);
         Assert.Contains("Mutabakat Yönetimi", html);
         Assert.Contains("CSV/TXT mutabakat", html);
         Assert.Contains("compare-form", html);

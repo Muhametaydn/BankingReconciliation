@@ -1,0 +1,3 @@
+BranchCode,FundCode,TransactionNumber,TransactionDate,Quantity,Amount,FeeAmount
+BEYLIKDUZU,FEE,TXF001,2026-08-15,10,1000,2.50
+BEYLIKDUZU,FEE,TXF002,2026-08-15,20,2000,4.00

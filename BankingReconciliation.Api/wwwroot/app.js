@@ -244,12 +244,12 @@ schemaAddButton.addEventListener("click", () => {
         field: `ExtraField${suffix}`,
         name: `ExtraField${suffix}`,
         type: "Text",
-        required: false,
+        required: true,
         allowedValues: [],
         description: "Kullanıcı tanımlı ek kolon."
     });
     renderFileSchema(existing);
-    showSchemaStatus("Yeni kolon eklendi. Kaydetmeden önce alan ve başlık adını düzenleyebilirsiniz.", "success");
+    showSchemaStatus("Yeni kolon zorunlu olarak eklendi. Sayısal kolonlar kaydedildiğinde karşılaştırmaya otomatik katılır.", "success");
 });
 
 schemaList.addEventListener("click", event => {
@@ -1708,7 +1708,8 @@ async function saveFileSchema() {
         }
 
         renderFileSchema(payload);
-        showSchemaStatus("Şema güncellendi. Validasyon ve karşılaştırma yeni ayarları kullanacak.", "success");
+        await loadComparisonSettings();
+        showSchemaStatus("Şema güncellendi. Yeni zorunlu kolonlar validasyonda, yeni sayısal kolonlar karşılaştırmada kontrol edilecek.", "success");
         await loadAuditEvents(true);
     } catch {
         showSchemaStatus(getNetworkErrorMessage(), "error");

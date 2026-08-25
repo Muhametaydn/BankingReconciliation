@@ -1639,6 +1639,163 @@ public class ReconciliationEndpointTests : IClassFixture<BankingReconciliationWe
     }
 
     [Fact]
+    public async Task UpdateReconciliationFileSchema_AutomaticallyChecksNewNumericColumn()
+    {
+        await using var factory = new BankingReconciliationWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var schema = CreateSchemaUpdate();
+        schema.Columns =
+        [
+            .. schema.Columns,
+            new()
+            {
+                Field = "Commission",
+                Name = "Commission",
+                Type = "Decimal",
+                Required = true,
+                MaxDecimalPlaces = 2,
+                Description = "Komisyon tutari."
+            }
+        ];
+
+        using var updateResponse = await client.PutAsJsonAsync("/api/reconciliation-file-schema", schema);
+        using var settingsResponse = await client.GetAsync("/api/reconciliation-comparison-settings");
+        using var settingsBody = await JsonDocument.ParseAsync(
+            await settingsResponse.Content.ReadAsStreamAsync());
+        using var content = CreateMultipartContent(
+            branchCsv: """
+                BranchCode,FundCode,TransactionNumber,TransactionDate,Quantity,Amount,Commission
+                BEYLIKDUZU,A,TX001,2026-06-26,100,10000,12.34
+                """,
+            bankCsv: """
+                BranchCode,FundCode,TransactionNumber,TransactionDate,Quantity,Amount,Commission
+                BEYLIKDUZU,A,TX001,2026-06-26,100,10000,10.00
+                """);
+        using var compareResponse = await client.PostAsync("/api/reconciliations/compare", content);
+        using var compareBody = await JsonDocument.ParseAsync(
+            await compareResponse.Content.ReadAsStreamAsync());
+        using var validationContent = CreateValidationMultipartContent("""
+            BranchCode,FundCode,TransactionNumber,TransactionDate,Quantity,Amount,Commission
+            BEYLIKDUZU,A,TX001,2026-06-26,100,10000,
+            """);
+        using var validationResponse = await client.PostAsync(
+            "/api/reconciliation-file-schema/validate",
+            validationContent);
+        using var validationBody = await JsonDocument.ParseAsync(
+            await validationResponse.Content.ReadAsStreamAsync());
+
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
+        Assert.Contains(
+            settingsBody.RootElement.GetProperty("comparisonFields").EnumerateArray(),
+            field => field.GetString() == "Commission");
+        Assert.Contains(
+            settingsBody.RootElement.GetProperty("resultFields").EnumerateArray(),
+            field => field.GetString() == "Commission");
+        var result = Assert.Single(compareBody.RootElement.GetProperty("results").EnumerateArray());
+        Assert.Equal("FieldMismatch", result.GetProperty("status").GetString());
+        Assert.Equal(2.34m, result.GetProperty("fieldDifferences").GetProperty("Commission").GetDecimal());
+        Assert.False(validationBody.RootElement.GetProperty("isValid").GetBoolean());
+        Assert.Equal("Commission", validationBody.RootElement.GetProperty("columnName").GetString());
+    }
+
+    [Fact]
+    public async Task UpdateReconciliationFileSchema_RemovesStaleComparisonSettings()
+    {
+        await using var factory = new BankingReconciliationWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var schema = CreateSchemaUpdate();
+        schema.Columns =
+        [
+            .. schema.Columns,
+            new()
+            {
+                Field = "Commission",
+                Name = "Commission",
+                Type = "Decimal",
+                Required = true,
+                Description = "Komisyon tutari."
+            },
+            new()
+            {
+                Field = "Reference",
+                Name = "Reference",
+                Type = "Text",
+                Required = true,
+                Description = "Harici referans."
+            }
+        ];
+
+        using var addColumnsResponse = await client.PutAsJsonAsync(
+            "/api/reconciliation-file-schema",
+            schema);
+        var settings = new ReconciliationComparisonOptions
+        {
+            NormalizeCodeCase = true,
+            TrimTextValues = true,
+            MatchingFields = ["BranchCode", "FundCode", "TransactionNumber"],
+            ComparisonFields = ["Quantity", "Amount", "Commission"],
+            ResultFields = ["BranchCode", "FundCode", "TransactionNumber", "Commission", "Reference"],
+            FieldMappings = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Commission"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["12,34"] = "12.34"
+                },
+                ["Reference"] = new(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["REF-OLD"] = "REF-NEW"
+                }
+            }
+        };
+        using var updateSettingsResponse = await client.PutAsJsonAsync(
+            "/api/reconciliation-comparison-settings",
+            settings);
+
+        var changedSchema = CreateSchemaUpdate();
+        changedSchema.Columns =
+        [
+            .. changedSchema.Columns,
+            new()
+            {
+                Field = "Commission",
+                Name = "Commission",
+                Type = "Text",
+                Required = true,
+                Description = "Komisyon aciklamasi."
+            }
+        ];
+        using var changeSchemaResponse = await client.PutAsJsonAsync(
+            "/api/reconciliation-file-schema",
+            changedSchema);
+        using var settingsResponse = await client.GetAsync(
+            "/api/reconciliation-comparison-settings");
+        using var settingsBody = await JsonDocument.ParseAsync(
+            await settingsResponse.Content.ReadAsStreamAsync());
+        var comparisonFields = settingsBody.RootElement
+            .GetProperty("comparisonFields")
+            .EnumerateArray()
+            .Select(field => field.GetString())
+            .ToArray();
+        var resultFields = settingsBody.RootElement
+            .GetProperty("resultFields")
+            .EnumerateArray()
+            .Select(field => field.GetString())
+            .ToArray();
+        var fieldMappings = settingsBody.RootElement.GetProperty("fieldMappings");
+
+        Assert.Equal(HttpStatusCode.OK, addColumnsResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, updateSettingsResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, changeSchemaResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, settingsResponse.StatusCode);
+        Assert.DoesNotContain("Commission", comparisonFields);
+        Assert.Contains("Commission", resultFields);
+        Assert.DoesNotContain("Reference", resultFields);
+        Assert.True(fieldMappings.TryGetProperty("Commission", out _));
+        Assert.False(fieldMappings.TryGetProperty("Reference", out _));
+    }
+
+    [Fact]
     public async Task ValidateReconciliationFileSchema_ReturnsValidResult_WhenFileMatchesSchema()
     {
         using var content = CreateValidationMultipartContent("""

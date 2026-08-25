@@ -72,13 +72,13 @@ internal sealed class AwsKmsReconciliationAuditArchiveSigner :
         string keyId,
         byte[] digest,
         byte[] signature) => new()
-    {
-        KeyId = keyId,
-        Message = new MemoryStream(digest, writable: false),
-        MessageType = MessageType.DIGEST,
-        Signature = new MemoryStream(signature, writable: false),
-        SigningAlgorithm = SigningAlgorithmSpec.RSASSA_PSS_SHA_256
-    };
+        {
+            KeyId = keyId,
+            Message = new MemoryStream(digest, writable: false),
+            MessageType = MessageType.DIGEST,
+            Signature = new MemoryStream(signature, writable: false),
+            SigningAlgorithm = SigningAlgorithmSpec.RSASSA_PSS_SHA_256
+        };
 
     public void Dispose()
     {

@@ -4,6 +4,9 @@ obj/
 
 # Private project notes and generated documentation
 *.md
+!README.md
+!NEXT_STEPS.md
+!PRODUCTION_READINESS.md
 .agents/
 .codex/
 .local-ci/
