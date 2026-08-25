@@ -6,8 +6,6 @@ obj/
 *.md
 !README.md
 !README.tr.md
-!NEXT_STEPS.md
-!PRODUCTION_READINESS.md
 .agents/
 .codex/
 .local-ci/
